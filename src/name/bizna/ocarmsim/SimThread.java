@@ -252,7 +252,7 @@ public class SimThread extends Thread implements ActionListener {
 									}
 								}
 								finally {
-									if(addrInfoLock.isHeldByCurrentThread()) addrInfoLock.unlock();
+									if(addrInfoLock != null && addrInfoLock.isHeldByCurrentThread()) addrInfoLock.unlock();
 								}
 							}
 							else SwingUtilities.invokeLater(this);
