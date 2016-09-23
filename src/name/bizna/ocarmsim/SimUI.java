@@ -12,7 +12,6 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
-
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -21,9 +20,9 @@ import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-
 import name.bizna.jarm.ByteArrayRegion;
 import name.bizna.jarm.CPU;
+import name.bizna.ocarmsim.gdb.GDBServer;
 
 public class SimUI implements ActionListener, KeyListener {
 	private JFrame window;
@@ -39,7 +38,9 @@ public class SimUI implements ActionListener, KeyListener {
 	private ROMRegion rom;
 	private SRAMRegion sram;
 	private ByteArrayRegion[] rams;
-	public SimUI(int screen_tier, FakeMachine machine, CPU cpu, CP3 cp3, ROMRegion rom, SRAMRegion sram, ByteArrayRegion[] rams, String addrinfocmd) {
+	private GDBServer gdbServer;
+	
+	public SimUI(int screen_tier, FakeMachine machine, CPU cpu, CP3 cp3, ROMRegion rom, SRAMRegion sram, ByteArrayRegion[] rams, String addrinfocmd, int gdbPort, boolean gdbVerbose) {
 		if(screen_tier < 0) screen_tier = 0;
 		else if(screen_tier > 3) screen_tier = 3;
 		this.machine = machine;
@@ -94,7 +95,13 @@ public class SimUI implements ActionListener, KeyListener {
 		window.pack();
 		window.setVisible(true);
 		thread.start();
+
+		if (gdbPort != 0) {
+			gdbServer = new GDBServer(gdbPort, gdbVerbose, thread, cpu);
+			new Thread(gdbServer).start();
+		}
 	}
+	
 	@Override
 	public void actionPerformed(ActionEvent e) {
 		Object src = e.getSource();
@@ -116,9 +123,9 @@ public class SimUI implements ActionListener, KeyListener {
 				}
 				catch(IOException exception) {
 					JOptionPane.showMessageDialog(window, "Error while dumping core: "+exception.toString(), null, JOptionPane.ERROR_MESSAGE);
-				}
 			}
 		}
+	}
 	}
 	// http://www.jpct.net/forum2/index.php?topic=749.0
 	private int translateFromAWT(int aCode) {
@@ -234,7 +241,7 @@ public class SimUI implements ActionListener, KeyListener {
 		case KeyEvent.VK_META: return 219;
 		}
 		return 0;
-	} 
+	}
 	@Override
 	public void keyPressed(KeyEvent arg0) {
 		Integer keyChar = Integer.valueOf(0);
@@ -275,15 +282,15 @@ public class SimUI implements ActionListener, KeyListener {
 	public void disableCoreDumps() {
 		coreButton.setEnabled(false);
 	}
-	
+
 	private short swapShort(boolean bigEndian, int v) {
 		if(bigEndian) return (short)v;
 		else return Short.reverseBytes((short)v);
-	}
+		}
 	private int swapInt(boolean bigEndian, int v) {
 		if(bigEndian) return v;
 		else return Integer.reverseBytes(v);
-	}
+		}
 	private int putNoteHeader(ByteBuffer buf, boolean E, int offset, int size) {
 		/* Elf32_Phdr */
 		buf.clear();
@@ -352,11 +359,11 @@ public class SimUI implements ActionListener, KeyListener {
 		noteBuf.flip();
 		ByteBuffer buf = ByteBuffer.allocate(36);
 		/* Elf32_Ehdr */
-		/* magic; ELFCLASS32 (1), ELFDATA2LSB/ELFDATA2MSB (1/2) depending on endianness
+ /* magic; ELFCLASS32 (1), ELFDATA2LSB/ELFDATA2MSB (1/2) depending on endianness
 		 * ELF_VERSION (1), caller-provided ABI and version, and padding to 16
 		 */
 		out.write(new byte[]{0x7f, 'E', 'L', 'F', 1, (byte)(E?2:1), 1, abi,
-				abiVersion, 0, 0, 0, 0, 0, 0, 0});
+			abiVersion, 0, 0, 0, 0, 0, 0, 0});
 		buf.clear();
 		buf.putShort(swapShort(E, 4)); // e_type = ET_CORE
 		buf.putShort(swapShort(E, 40)); // e_machine = EM_ARM
@@ -370,7 +377,7 @@ public class SimUI implements ActionListener, KeyListener {
 		int numRams = 0;
 		for(ByteArrayRegion module : rams) {
 			if(module != null) ++numRams;
-		}
+			}
 		// one PT_NOTE, one PT_LOAD for ROM, one PT_LOAD for SRAM, one PT_LOAD for each RAM module
 		buf.putShort(swapShort(E, 3 + numRams)); // e_phnum as above
 		// e_shentsize/shnum/shstrndx = 0

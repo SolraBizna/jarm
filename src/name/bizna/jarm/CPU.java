@@ -193,6 +193,7 @@ public final class CPU {
 	public boolean isLittleEndian() { return (cpsr & (1<<CPSR_BIT_E)) == 0; }
 	public boolean isBigEndian() { return (cpsr & (1<<CPSR_BIT_E)) != 0; }
 	public boolean isPrivileged() { return mode.privileged; }
+	public void writeCPSR(int value) { cpsr = value; }
 	public int readCPSR() { return cpsr; }
 	private void instrWriteCurCPSR(int value, int mask, boolean isExceptionReturn) {
 		/* (B1-1153) */
@@ -1653,6 +1654,10 @@ public final class CPU {
 			else
 				out.printf("  %6.6s %08X xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n", mode.toString(), sp[mode.spIndex]);
 		}
+	}
+	
+	public Coprocessor getCoprocessor(int id){
+		return coprocessors[id];
 	}
 }
 /* Note to self: Exception return forms of the data-processing instructions are noted on B4-1613 */

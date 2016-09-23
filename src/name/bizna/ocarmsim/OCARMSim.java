@@ -3,7 +3,6 @@ package name.bizna.ocarmsim;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-
 import name.bizna.jarm.ByteArrayRegion;
 import name.bizna.jarm.CPU;
 import name.bizna.jarm.PhysicalMemorySpace;
@@ -29,6 +28,10 @@ public class OCARMSim {
 		System.err.println("    Adds a normal filesystem at the specified path. -fsro adds a read-only filesystem, -fsrw adds a writable one.");
 		System.err.println("  -addrinfocmd \"command to execute\"");
 		System.err.println("    Specifies an external command to use to map instruction addresses to useful information. The command should read hexadecimal addresses one line at a time, and output exactly one line of information for each line of input. (e.g. -addrinfocmd \"arm-none-eabi-addr2line -spfe path/to/unstripped_binary.elf\")");
+		System.err.println("  -gdb port");
+		System.err.println("    Specifies the port where the gdbserver should listen.");
+		System.err.println("  -gdbverbose");
+		System.err.println("    Specifies the port where the gdbserver should listen.");
 		System.err.println("    The parser that processes the command string is very simple. If you want complex argument escaping, consider making a shell script and executing that.");
 		/*
 		 * TODO: analyze drive's error behavior and write this code
@@ -47,6 +50,7 @@ public class OCARMSim {
 			this.writable = writable;
 		}
 	}
+	
 	public static void main(String[] args) throws IOException {
 		if(args.length == 0) {
 			usage();
@@ -58,6 +62,8 @@ public class OCARMSim {
 		String eeprom_image_path = null;
 		String sram_image_path = null;
 		String addrinfocmd = null;
+		int gdbPort = 0;
+		boolean gdbVerbose = false;
 		ArrayList<FSSpec> filesystems = new ArrayList<FSSpec>();
 		boolean sram_writable = false;
 		int screen_tier = 1;
@@ -147,6 +153,18 @@ public class OCARMSim {
 					addrinfocmd = args[i++];
 				}
 			}
+			else if(arg.equals("-gdb")){
+				if(i >= args.length) {
+					System.err.println("No parameter given to -gdb");
+					command_line_valid = false;
+				}
+				else {
+					gdbPort = Integer.parseInt(args[i++]);
+				}
+			}
+			else if(arg.equals("-gdbverbose")){
+				gdbVerbose = true;
+			}
 			else {
 				System.err.println("Unknown command line argument: " + arg);
 				command_line_valid = false;
@@ -190,6 +208,6 @@ public class OCARMSim {
 		for(FSSpec spec : filesystems) {
 			machine.addNode(new SimFilesystem(spec.basepath, spec.writable));
 		}
-		new SimUI(screen_tier, machine, cpu, cp3, rom, sram, rams, addrinfocmd);
+		new SimUI(screen_tier, machine, cpu, cp3, rom, sram, rams, addrinfocmd, gdbPort, gdbVerbose);
 	}
 }

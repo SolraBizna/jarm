@@ -3,3 +3,6 @@ bin/**
 .metadata
 .project
 .settings
+/nbproject/private/
+/build/
+/dist/

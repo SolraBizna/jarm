@@ -15,7 +15,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -25,7 +24,6 @@ import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
-
 import li.cil.oc.api.machine.ExecutionResult;
 import name.bizna.jarm.AlignmentException;
 import name.bizna.jarm.BusErrorException;
@@ -469,5 +467,9 @@ public class SimThread extends Thread implements ActionListener {
 				}
 			}
 		}
+	}
+
+	public ExecutionMode getMode() {
+		return mode;
 	}
 }
