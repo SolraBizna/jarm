@@ -13,6 +13,7 @@ import name.bizna.jarm.EscapeRetryException;
 import name.bizna.jarm.FPU;
 import name.bizna.ocarmsim.BasicDebugger;
 import name.bizna.ocarmsim.Breakpoint;
+import name.bizna.ocarmsim.BreakpointException;
 import name.bizna.ocarmsim.OCARM;
 
 /**
@@ -311,7 +312,11 @@ public class GDBDebugger extends BasicDebugger {
 
 		try {
 			for (int i = 0; i < length; i++) {
-				buffer[i] = cpu.getVirtualMemorySpace().readByte(addr + i);
+				try {
+					buffer[i] = cpu.getVirtualMemorySpace().readByte(addr + i);
+				} catch (BreakpointException ignored) {
+					buffer[i] = 0;
+				}
 			}
 
 			socket.write(new GDBPacket(new String(toHex(buffer))));
@@ -330,7 +335,10 @@ public class GDBDebugger extends BasicDebugger {
 			char[] data = packet.getData().split(":")[1].toCharArray();
 			for (int i = 0; i < length; i++) {
 				byte value = Byte.parseByte(new String(new char[]{data[i * 2], data[i * 2 + 1]}), 16);
-				cpu.getVirtualMemorySpace().writeByte(addr, value);
+				try {
+					cpu.getVirtualMemorySpace().writeByte(addr, value);
+				} catch (BreakpointException ignored) {
+				}
 			}
 
 			socket.write(new GDBPacket("OK"));

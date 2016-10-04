@@ -25,6 +25,7 @@ import name.bizna.jarm.AlignmentException;
 import name.bizna.jarm.BusErrorException;
 import name.bizna.jarm.EscapeRetryException;
 import name.bizna.ocarmsim.BasicDebugger;
+import name.bizna.ocarmsim.BreakpointException;
 
 /**
  *
@@ -172,6 +173,7 @@ public class CPUStatePanel extends JPanel {
 				try {
 					nextInstr = String.format("%08X", debugger.getCpu().getVirtualMemorySpace().readInt(pc, true, false));
 				} catch (AlignmentException | BusErrorException | EscapeRetryException e) {
+				} catch (BreakpointException ignored) {
 				}
 				nextLabel.setText(String.format("Next instruction: %08X=%8s", pc, nextInstr));
 				stateLabel.setText(" State: " + debugger.getState().toString());
