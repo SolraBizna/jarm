@@ -3,7 +3,9 @@ package name.bizna.ocarmsim;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.Reader;
 import java.util.List;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
@@ -59,19 +61,25 @@ public class Launcher {
 			System.exit(1);
 		}
 
+		launch(new FileReader(new File(args[args.length - 1])), addrinfocmd, gdbPort, gdbVerbose);
+	}
+
+	public static void launch(Reader hardwareDefinition, String addrinfocmd, int gdbPort, boolean gdbVerbose) throws IOException {
 		BasicDebugger debugger = gdbPort == 0 ? new SimpleDebugger(addrinfocmd) : new GDBDebugger(gdbPort, gdbVerbose);
 
-		HardwareDefinition hardware = JAXB.unmarshal(new File(args[args.length - 1]), HardwareDefinition.class);
+		HardwareDefinition hardware = JAXB.unmarshal(hardwareDefinition, HardwareDefinition.class);
 		List<JComponent> components = hardware.prepareSimulation(debugger);
 
 		JFrame frame = new JFrame("ocarmsim");
 		frame.setMinimumSize(new Dimension(100, 30));
 		frame.setLayout(new GridLayout(2, components.size() / 2));
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		components.forEach(frame::add);
+		for (JComponent c : components) {
+			frame.add(c);
+		}
 
-		if (debugger.getComponent() != null) {
-			frame.add(debugger.getComponent());
+		if (debugger.getGUIComponent() != null) {
+			frame.add(debugger.getGUIComponent());
 		}
 		frame.pack();
 		frame.setVisible(true);
@@ -90,7 +98,7 @@ public class Launcher {
 		System.err.println("  -gdb port");
 		System.err.println("    Specifies the port where the gdbserver should listen.");
 		System.err.println("  -gdbverbose");
-		System.err.println("    Specifies the port where the gdbserver should listen.");
+		System.err.println("    Print all gdb packets that are sent or received.");
 		System.err.println("  -addrinfocmd \"command to execute\"");
 		System.err.println("    Specifies an external command to use to map instruction addresses to useful information. The command should read hexadecimal addresses one line at a time, and output exactly one line of information for each line of input. (e.g. -addrinfocmd \"arm-none-eabi-addr2line -spfe path/to/unstripped_binary.elf\")");
 		System.err.println("    The parser that processes the command string is very simple. If you want complex argument escaping, consider making a shell script and executing that.");

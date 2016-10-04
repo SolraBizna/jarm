@@ -11,23 +11,15 @@ public final class PhysicalMemorySpace {
 			this.end = base + region.getRegionSize();
 			this.region = region;
 		}
-		private long base, end;
+		private final long base, end;
 		private MemoryRegion region;
 
 		public long getBase() {
 			return base;
 		}
 
-		public void setBase(long base) {
-			this.base = base;
-		}
-
 		public long getEnd() {
 			return end;
-		}
-
-		public void setEnd(long end) {
-			this.end = end;
 		}
 
 		public MemoryRegion getRegion() {
@@ -48,7 +40,7 @@ public final class PhysicalMemorySpace {
 			else if(address < region.base) b = c;
 			else t = c + 1;
 		}
-		throw new BusErrorException("Failed to get physical region: Requested address is " + address);
+		throw new BusErrorException("failed to get physical region" , address, BusErrorException.AccessType.UNKNOWN);
 	}
 	private int accessCycleBill;
 	public final byte readByte(long address) throws BusErrorException, EscapeRetryException {

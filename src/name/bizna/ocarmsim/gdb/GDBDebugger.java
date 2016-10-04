@@ -1,12 +1,12 @@
 package name.bizna.ocarmsim.gdb;
 
-import java.awt.Component;
 import java.awt.event.ActionEvent;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.AbstractAction;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JPanel;
 import name.bizna.jarm.BusErrorException;
 import name.bizna.jarm.EscapeRetryException;
@@ -451,7 +451,7 @@ public class GDBDebugger extends BasicDebugger {
 	}
 
 	@Override
-	public Component getComponent() {
+	public JComponent getGUIComponent() {
 		return new DebugPanel();
 	}
 

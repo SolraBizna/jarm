@@ -1,12 +1,13 @@
 package name.bizna.ocarmsim;
 
-import java.awt.Component;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.JComponent;
 import li.cil.oc.api.machine.ExecutionResult;
+import li.cil.oc.api.network.Component;
 import name.bizna.jarm.AlignmentException;
 import name.bizna.jarm.BusErrorException;
 import name.bizna.jarm.CPU;
@@ -14,6 +15,7 @@ import name.bizna.jarm.Debugger;
 import name.bizna.jarm.UndefinedException;
 import name.bizna.jarm.UnimplementedInstructionException;
 import name.bizna.jarm.VirtualMemorySpace;
+import name.bizna.ocarmsim.components.SimComponent;
 
 /**
  *
@@ -34,9 +36,11 @@ public abstract class BasicDebugger extends Debugger implements Runnable {
 		cpu.reset(false, true, true);
 
 		// Reset components.
-		((FakeMachine) ((CP3) cpu.getCoprocessor(3)).getMachine()).getComponents().forEach((c) -> {
-			c.reset();
-		});
+		for (Component c : ((FakeMachine) ((CP3) cpu.getCoprocessor(3)).getMachine()).getComponents()) {
+			if (c instanceof SimComponent) {
+				((SimComponent) c).reset();
+			}
+		};
 
 		// Reset simulator.
 		setState(State.PAUSED);
@@ -214,24 +218,32 @@ public abstract class BasicDebugger extends Debugger implements Runnable {
 
 	@Override
 	public void onReadMemory(int addr, int size, boolean bigEndian) {
-		if (readWatchpoints.stream().filter(point -> (point.getAddress() & 0xFFFFFFFFL) < (addr & 0xFFFFFFFFL) + size && (addr & 0xFFFFFFFFL) < (point.getAddress() & 0xFFFFFFFFL) + (point.getLength() & 0xFFFFFFFFL)).count() > 0) {
+		if (breakpointsContainRegion(readWatchpoints, addr, size)) {
 			throw new BreakpointException();
 		}
 	}
 
 	@Override
 	public void onWriteMemory(int addr, int size, boolean bigEndian, long value) {
-		if (writeWatchpoints.stream().filter(point -> (point.getAddress() & 0xFFFFFFFFL) < (addr & 0xFFFFFFFFL) + size && (addr & 0xFFFFFFFFL) < (point.getAddress() & 0xFFFFFFFFL) + (point.getLength() & 0xFFFFFFFFL)).count() > 0) {
+		if (breakpointsContainRegion(writeWatchpoints, addr, size)) {
 			throw new BreakpointException();
 		}
 	}
 
 	@Override
 	public void onInstruction(CPU cpu, int addr) {
-		final int size = 4;
-		if (breakpoints.stream().filter(point -> (point.getAddress() & 0xFFFFFFFFL) < (addr & 0xFFFFFFFFL) + size && (addr & 0xFFFFFFFFL) < (point.getAddress() & 0xFFFFFFFFL) + (point.getLength() & 0xFFFFFFFFL)).count() > 0) {
+		if (breakpointsContainRegion(breakpoints, addr, 4)) {
 			throw new BreakpointException();
 		}
+	}
+
+	private boolean breakpointsContainRegion(Set<Breakpoint> points, int addr, int size) {
+		for (Breakpoint point : readWatchpoints) {
+			if ((point.getAddress() & 0xFFFFFFFFL) < (addr & 0xFFFFFFFFL) + size && (addr & 0xFFFFFFFFL) < (point.getAddress() & 0xFFFFFFFFL) + (point.getLength() & 0xFFFFFFFFL)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Override
@@ -240,7 +252,7 @@ public abstract class BasicDebugger extends Debugger implements Runnable {
 		notifyAll();
 	}
 
-	public abstract Component getComponent();
+	public abstract JComponent getGUIComponent();
 
 	public static enum State {
 		RUNNING, SLEEPING, PAUSED, CRASHED, FAILED

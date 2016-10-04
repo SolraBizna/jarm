@@ -276,7 +276,9 @@ public class FakeMachine implements Machine {
 	public Signal popSignal() {
 		synchronized (signals) {
 			if (signals.isEmpty()) {
-				OCARM.logger.info("signal poped: %s", "{none}");
+				if (OCARM.instance.shouldTraceInvocations()) {
+					OCARM.logger.info("signal popped: %s", "{none}");
+				}
 				return null;
 			} else {
 				Signal signal = signals.poll();

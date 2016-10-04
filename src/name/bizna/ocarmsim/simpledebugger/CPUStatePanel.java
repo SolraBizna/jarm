@@ -75,7 +75,7 @@ public class CPUStatePanel extends JPanel {
 			try {
 				panel = new JPanel();
 				add(panel);
-				JLabel addrInfoLabel = new JLabel(" ");
+				final JLabel addrInfoLabel = new JLabel(" ");
 				panel.add(addrInfoLabel);
 
 				List<String> list = new ArrayList<>();
@@ -83,7 +83,7 @@ public class CPUStatePanel extends JPanel {
 				while (m.find()) {
 					list.add(m.group(1).replace("\"", ""));
 				}
-				Process addrInfoProcess = new ProcessBuilder(list).redirectInput(ProcessBuilder.Redirect.PIPE).redirectOutput(ProcessBuilder.Redirect.PIPE).redirectError(ProcessBuilder.Redirect.INHERIT).start();
+				final Process addrInfoProcess = new ProcessBuilder(list).redirectInput(ProcessBuilder.Redirect.PIPE).redirectOutput(ProcessBuilder.Redirect.PIPE).redirectError(ProcessBuilder.Redirect.INHERIT).start();
 				addrinfoWriter = new OutputStreamWriter(addrInfoProcess.getOutputStream());
 				Thread errThread = new Thread() {
 					@Override
@@ -156,46 +156,49 @@ public class CPUStatePanel extends JPanel {
 
 	public void update() {
 		if (!updateRunning.getAndSet(true)) {
-			SwingUtilities.invokeLater(() -> {
-				for (int n = 0; n < 16; ++n) {
-					gprLabels[n].setText(String.format("%3s: %08X", gprNames[n], debugger.getCpu().readRegister(n)));
-				}
-				int pc = debugger.getCpu().readPC() - 4;
-				if (addrinfoWriter != null) {
+			SwingUtilities.invokeLater(new Runnable() {
+				@Override
+				public void run() {
+					for (int n = 0; n < 16; ++n) {
+						gprLabels[n].setText(String.format("%3s: %08X", gprNames[n], debugger.getCpu().readRegister(n)));
+					}
+					int pc = debugger.getCpu().readPC() - 4;
+					if (addrinfoWriter != null) {
+						try {
+							addrinfoWriter.write(String.format("%08X\n", pc));
+							addrinfoWriter.flush();
+						} catch (IOException ex) {
+							Logger.getLogger(CPUStatePanel.class.getName()).log(Level.SEVERE, "Exception while writing to the addrinfocmd process", ex);
+						}
+					}
+					String nextInstr = "Error";
 					try {
-						addrinfoWriter.write(String.format("%08X\n", pc));
-						addrinfoWriter.flush();
-					} catch (IOException ex) {
-						Logger.getLogger(CPUStatePanel.class.getName()).log(Level.SEVERE, "Exception while writing to the addrinfocmd process", ex);
+						nextInstr = String.format("%08X", debugger.getCpu().getVirtualMemorySpace().readInt(pc, true, false));
+					} catch (AlignmentException | BusErrorException | EscapeRetryException e) {
+					} catch (BreakpointException ignored) {
 					}
-				}
-				String nextInstr = "Error";
-				try {
-					nextInstr = String.format("%08X", debugger.getCpu().getVirtualMemorySpace().readInt(pc, true, false));
-				} catch (AlignmentException | BusErrorException | EscapeRetryException e) {
-				} catch (BreakpointException ignored) {
-				}
-				nextLabel.setText(String.format("Next instruction: %08X=%8s", pc, nextInstr));
-				stateLabel.setText(" State: " + debugger.getState().toString());
-				int cpsr = debugger.getCpu().readCPSR();
-				int mask = 1 << 31;
-				StringBuilder cpsrBitsBuilder = new StringBuilder();
-				while (mask != 0) {
-					if ((cpsr & mask) != 0) {
-						cpsrBitsBuilder.append('1');
-					} else {
-						cpsrBitsBuilder.append('0');
+					nextLabel.setText(String.format("Next instruction: %08X=%8s", pc, nextInstr));
+					stateLabel.setText(" State: " + debugger.getState().toString());
+					int cpsr = debugger.getCpu().readCPSR();
+					int mask = 1 << 31;
+					StringBuilder cpsrBitsBuilder = new StringBuilder();
+					while (mask != 0) {
+						if ((cpsr & mask) != 0) {
+							cpsrBitsBuilder.append('1');
+						} else {
+							cpsrBitsBuilder.append('0');
+						}
+						mask = mask >>> 1;
 					}
-					mask = mask >>> 1;
-				}
-				cpsrBitsLabel.setText(cpsrBitsBuilder.toString());
-				if (debugger.getState() != BasicDebugger.State.CRASHED) {
-					crashedWhy.setText("                                ");
-				}
+					cpsrBitsLabel.setText(cpsrBitsBuilder.toString());
+					if (debugger.getState() != BasicDebugger.State.CRASHED) {
+						crashedWhy.setText("                                ");
+					}
 
-				repaint();
+					repaint();
 
-				updateRunning.set(false);
+					updateRunning.set(false);
+				}
 			});
 		}
 	}

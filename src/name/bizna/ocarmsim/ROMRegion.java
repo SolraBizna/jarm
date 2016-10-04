@@ -52,7 +52,7 @@ public class ROMRegion extends ByteBackedRegion {
 	@Override
 	public void backingWriteByte(int address, byte v) throws BusErrorException,
 			EscapeRetryException {
-		throw new BusErrorException("ROM is readonly: Requested address is " + address);
+		throw new BusErrorException("ROM is readonly", address, BusErrorException.AccessType.WRITE);
 	}
 
 	@Override

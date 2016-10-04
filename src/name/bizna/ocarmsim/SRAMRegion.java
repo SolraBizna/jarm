@@ -11,10 +11,10 @@ import name.bizna.jarm.EscapeRetryException;
 
 public class SRAMRegion extends ByteBackedRegion {
 	
-	private File path;
-	private boolean writable;
-	byte[] sramArray;
-	byte[] nvramArray;
+	private final File path;
+	private final boolean writable;
+	private final byte[] sramArray;
+	private final byte[] nvramArray;
 
 	SRAMRegion(File inpath, int arraySize, boolean writable) throws IOException {
 		path = inpath;
@@ -63,7 +63,7 @@ public class SRAMRegion extends ByteBackedRegion {
 	}
 	
 	public void flushToNVRAM() throws IOException {
-		nvramArray = Arrays.copyOf(sramArray, sramArray.length);
+		System.arraycopy(sramArray, 0, nvramArray, 0, sramArray.length);
 		maybeWriteNVRAM();
 	}
 	
@@ -83,15 +83,7 @@ public class SRAMRegion extends ByteBackedRegion {
 		return sramArray;
 	}
 
-	public void setSramArray(byte[] sramArray) {
-		this.sramArray = sramArray;
-	}
-
 	public byte[] getNvramArray() {
 		return nvramArray;
-	}
-
-	public void setNvramArray(byte[] nvramArray) {
-		this.nvramArray = nvramArray;
 	}
 }

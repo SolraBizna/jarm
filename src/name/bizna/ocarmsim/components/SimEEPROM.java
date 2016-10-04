@@ -71,7 +71,7 @@ public class SimEEPROM extends SimComponent {
 		if (array.length > (sram.getSramArray().length < 256 ? 256 : sram.getSramArray().length)) {
 			return new Object[]{null, "data too long"};
 		}
-		sram.setNvramArray(array);
+		System.arraycopy(array, 0, sram.getNvramArray(), 0, array.length);
 		try {
 			sram.maybeWriteNVRAM();
 		} catch (IOException e) {

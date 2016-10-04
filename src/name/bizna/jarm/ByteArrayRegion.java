@@ -64,7 +64,7 @@ public final class ByteArrayRegion extends ByteBackedRegion {
 			dirty = true;
 			backing[address] = b;
 		} else {
-			throw new BusErrorException("ByteArrayRegion is readonly: Requested address is " + address);
+			throw new BusErrorException("ByteArrayRegion is readonly", address, BusErrorException.AccessType.WRITE);
 		}
 	}
 

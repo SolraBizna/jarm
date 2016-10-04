@@ -66,12 +66,12 @@ public class JARMArchitecture implements Architecture {
 		}
 		@Override
 		public void backingWriteByte(int address, byte b) throws BusErrorException {
-			throw new BusErrorException("ROM is readonly: Requested address is " + address);
+			throw new BusErrorException("ROM is readonly", address, BusErrorException.AccessType.WRITE);
 		}
 		@Override
 		public byte backingReadByte(int address) throws BusErrorException, EscapeRetryException {
 			if(!romMappingValid) attemptShadowEEPROM();
-			if(romArray == null) throw new BusErrorException("ROM doesn't exist: Requested address is " + address);
+			if(romArray == null) throw new BusErrorException("ROM doesn't exist", address, BusErrorException.AccessType.READ);
 			int p = (int)((address&romArrayMask)+romArchSafeOffset);
 			if(p < 0 || p >= romArray.length) return (byte)0;
 			return romArray[p];
@@ -86,15 +86,15 @@ public class JARMArchitecture implements Architecture {
 		@Override
 		public void backingWriteByte(int address, byte b) throws BusErrorException, EscapeRetryException {
 			if(!sramMappingValid) attemptShadowEEPROM();
-			if(sramArray == null) throw new BusErrorException("SRAM doesn't exist: Requested address is " + address);
-			if(address < 0 || address >= sramArray.length) throw new BusErrorException("Address is out of bounds for SRAM: Requested address is " + address);
+			if(sramArray == null) throw new BusErrorException("SRAM doesn't exist", address, BusErrorException.AccessType.WRITE);
+			if(address < 0 || address >= sramArray.length) throw new BusErrorException("address is out of bounds for SRAM", address, BusErrorException.AccessType.WRITE);
 			sramArray[address] = b;
 		}
 		@Override
 		public byte backingReadByte(int address) throws BusErrorException, EscapeRetryException {
 			if(!sramMappingValid) attemptShadowEEPROM();
-			if(sramArray == null) throw new BusErrorException("SRAM doesn't exist: Requested address is " + address);
-			if(address < 0 || address >= sramArray.length) throw new BusErrorException("Address is out of bounds for SRAM: Requested address is " + address);
+			if(sramArray == null) throw new BusErrorException("SRAM doesn't exist", address, BusErrorException.AccessType.READ);
+			if(address < 0 || address >= sramArray.length) throw new BusErrorException("address is out of bounds for SRAM", address, BusErrorException.AccessType.READ);
 			return sramArray[address];
 		}
 	}

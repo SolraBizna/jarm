@@ -250,7 +250,7 @@ public final class CPU {
 		spsr[mode.spsrIndex] = (spsr[mode.spsrIndex] & ~writeMask) | (value & writeMask);
 	}
 	/*** MEMORY MODEL ***/
-	private PhysicalMemorySpace mem = new PhysicalMemorySpace();
+	private final PhysicalMemorySpace mem = new PhysicalMemorySpace();
 	public PhysicalMemorySpace getMemorySpace() { return mem; }
 	private final VirtualMemorySpace vm;
 	public VirtualMemorySpace getVirtualMemorySpace() { return vm; }
