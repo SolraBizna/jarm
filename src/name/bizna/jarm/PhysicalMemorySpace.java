@@ -1,16 +1,42 @@
 package name.bizna.jarm;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public final class PhysicalMemorySpace {
-	private static final class MappedRegion {
+	public static final class MappedRegion {
 		public MappedRegion(long base, MemoryRegion region) {
 			this.base = base;
 			this.end = base + region.getRegionSize();
 			this.region = region;
 		}
-		long base, end;
-		MemoryRegion region;
+		private long base, end;
+		private MemoryRegion region;
+
+		public long getBase() {
+			return base;
+		}
+
+		public void setBase(long base) {
+			this.base = base;
+		}
+
+		public long getEnd() {
+			return end;
+		}
+
+		public void setEnd(long end) {
+			this.end = end;
+		}
+
+		public MemoryRegion getRegion() {
+			return region;
+		}
+
+		public void setRegion(MemoryRegion region) {
+			this.region = region;
+		}
 	}
 	private MappedRegion[] memoryMap = new MappedRegion[0];
 	private MappedRegion getRegion(long address) throws BusErrorException {
@@ -22,7 +48,7 @@ public final class PhysicalMemorySpace {
 			else if(address < region.base) b = c;
 			else t = c + 1;
 		}
-		throw new BusErrorException();
+		throw new BusErrorException("Failed to get physical region: Requested address is " + address);
 	}
 	private int accessCycleBill;
 	public final byte readByte(long address) throws BusErrorException, EscapeRetryException {
@@ -97,5 +123,9 @@ public final class PhysicalMemorySpace {
 	}
 	public final void unmapAllRegions() {
 		memoryMap = new MappedRegion[0];
+	}
+	
+	public List<MappedRegion> getMappedRegions() {
+		return Arrays.asList(memoryMap);
 	}
 }

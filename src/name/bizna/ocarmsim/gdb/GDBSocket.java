@@ -77,6 +77,7 @@ public class GDBSocket implements Closeable {
 
 			if (checksum == packet.calculateChecksum()) {
 				writer.append('+');
+				writer.flush();
 				if (verbose) {
 					OCARM.logger.info("gdbsocket: read: %s", packet.getCompleteContent());
 				}
@@ -84,6 +85,7 @@ public class GDBSocket implements Closeable {
 			} else {
 				OCARM.logger.error("gdbsocket: received invalid checksum: expected %i got %i", packet.calculateChecksum(), checksum);
 				writer.append('-');
+				writer.flush();
 			}
 		}
 	}
@@ -100,7 +102,11 @@ public class GDBSocket implements Closeable {
 	}
 
 	private void require(char expected) throws IOException {
-		char got = (char) reader.read();
+		int raw = reader.read();
+		if (raw == -1) {
+			throw new IOException("Stream closed?");
+		}
+		char got = (char) raw;
 
 		if (expected != got) {
 			throw new RuntimeException("gdbserver: protocol error expected " + expected + " (" + (int) expected + "), got " + got + " (" + (int) got + ")");

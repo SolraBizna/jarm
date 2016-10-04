@@ -85,6 +85,9 @@ public final class CPU {
 	private int lr[] = new int[7];
 	private int cur_sp, cur_lr;
 	private int pc;
+	
+	private final Debugger debugger;
+	
 	public int readGPR(int r) {
 		if(mode == ProcessorMode.FIQ && r >= 8) return gprFIQ[r-8];
 		else return gpr[r];
@@ -98,6 +101,7 @@ public final class CPU {
 	public int readLR() { return lr[mode.lrIndex]; }
 	public void writeLR(int new_value) { lr[mode.lrIndex] = new_value; }
 	public int readPC() { return isThumb() ? pc + 2 : pc + 4; }
+	public int readCurrentPC() { return pc; }
 	public void interworkingBranch(int new_pc) {
 		if((new_pc & 1) != 0) {
 			/* THUMB jump */
@@ -248,7 +252,7 @@ public final class CPU {
 	/*** MEMORY MODEL ***/
 	private PhysicalMemorySpace mem = new PhysicalMemorySpace();
 	public PhysicalMemorySpace getMemorySpace() { return mem; }
-	private VirtualMemorySpace vm = new VirtualMemorySpace(mem);
+	private final VirtualMemorySpace vm;
 	public VirtualMemorySpace getVirtualMemorySpace() { return vm; }
 	public int instructionReadWord(int address, boolean privileged) throws BusErrorException, AlignmentException, EscapeRetryException, EscapeCompleteException {
 		return vm.readInt(address, inStrictAlignMode(), isBigEndian());
@@ -313,7 +317,10 @@ public final class CPU {
 	CP15 cp15;
 	public boolean inStrictAlignMode() { return (cp15.SCTLR & (1<<CP15.SCTLR_BIT_A)) != 0; }
 	/*** INITIALIZATION ***/
-	public CPU() {
+	public CPU(Debugger debugger) {
+		this.debugger = debugger;
+		vm = new VirtualMemorySpace(mem, debugger);
+		
 		coprocessors[10] = new FPU(this);
 		coprocessors[11] = coprocessors[10];
 		coprocessors[14] = cp14 = new CP14(this);
@@ -392,6 +399,9 @@ public final class CPU {
 		if(!haveReset) throw new FatalException("execute() called without first calling reset()");
 		if((cpsr & CPSR_BIT_F) == 0 && haveFIQ()) generateFIQException();
 		if((cpsr & CPSR_BIT_I) == 0 && haveIRQ()) generateIRQException();
+		
+		if(debugger!=null) debugger.onInstruction(this, pc);
+		
 		if(isThumb()) throw new UndefinedException(); // Thumb not implemented
 		else executeARM();
 	}

@@ -12,21 +12,20 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Random;
 import java.util.TreeMap;
-
-import name.bizna.jarm.*;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.NBTTagCompound;
 import li.cil.oc.api.Driver;
 import li.cil.oc.api.driver.Item;
 import li.cil.oc.api.driver.item.Memory;
 import li.cil.oc.api.driver.item.Processor;
 import li.cil.oc.api.machine.Architecture;
+import li.cil.oc.api.machine.Architecture.NoMemoryRequirements;
 import li.cil.oc.api.machine.Context;
 import li.cil.oc.api.machine.ExecutionResult;
 import li.cil.oc.api.machine.LimitReachedException;
 import li.cil.oc.api.machine.Machine;
-import li.cil.oc.api.machine.Architecture.NoMemoryRequirements;
 import li.cil.oc.api.machine.Value;
+import name.bizna.jarm.*;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 
 @Architecture.Name("OC-ARM")
 @NoMemoryRequirements
@@ -67,12 +66,12 @@ public class JARMArchitecture implements Architecture {
 		}
 		@Override
 		public void backingWriteByte(int address, byte b) throws BusErrorException {
-			throw new BusErrorException();
+			throw new BusErrorException("ROM is readonly: Requested address is " + address);
 		}
 		@Override
 		public byte backingReadByte(int address) throws BusErrorException, EscapeRetryException {
 			if(!romMappingValid) attemptShadowEEPROM();
-			if(romArray == null) throw new BusErrorException();
+			if(romArray == null) throw new BusErrorException("ROM doesn't exist: Requested address is " + address);
 			int p = (int)((address&romArrayMask)+romArchSafeOffset);
 			if(p < 0 || p >= romArray.length) return (byte)0;
 			return romArray[p];
@@ -87,15 +86,15 @@ public class JARMArchitecture implements Architecture {
 		@Override
 		public void backingWriteByte(int address, byte b) throws BusErrorException, EscapeRetryException {
 			if(!sramMappingValid) attemptShadowEEPROM();
-			if(sramArray == null) throw new BusErrorException();
-			if(address < 0 || address >= sramArray.length) throw new BusErrorException();
+			if(sramArray == null) throw new BusErrorException("SRAM doesn't exist: Requested address is " + address);
+			if(address < 0 || address >= sramArray.length) throw new BusErrorException("Address is out of bounds for SRAM: Requested address is " + address);
 			sramArray[address] = b;
 		}
 		@Override
 		public byte backingReadByte(int address) throws BusErrorException, EscapeRetryException {
 			if(!sramMappingValid) attemptShadowEEPROM();
-			if(sramArray == null) throw new BusErrorException();
-			if(address < 0 || address >= sramArray.length) throw new BusErrorException();
+			if(sramArray == null) throw new BusErrorException("SRAM doesn't exist: Requested address is " + address);
+			if(address < 0 || address >= sramArray.length) throw new BusErrorException("Address is out of bounds for SRAM: Requested address is " + address);
 			return sramArray[address];
 		}
 	}
@@ -227,7 +226,7 @@ public class JARMArchitecture implements Architecture {
 
 	@Override
 	public boolean initialize() {
-		cpu = new CPU();
+		cpu = new CPU(null);
 		cp3 = new CP3(cpu, machine, this);
 		cpu.mapCoprocessor(3, cp3);
 		lastRunTime = Long.MIN_VALUE;

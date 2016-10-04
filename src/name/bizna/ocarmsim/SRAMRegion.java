@@ -5,7 +5,6 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
-
 import name.bizna.jarm.BusErrorException;
 import name.bizna.jarm.ByteBackedRegion;
 import name.bizna.jarm.EscapeRetryException;
@@ -80,4 +79,19 @@ public class SRAMRegion extends ByteBackedRegion {
 		}
 	}
 
+	public byte[] getSramArray() {
+		return sramArray;
+	}
+
+	public void setSramArray(byte[] sramArray) {
+		this.sramArray = sramArray;
+	}
+
+	public byte[] getNvramArray() {
+		return nvramArray;
+	}
+
+	public void setNvramArray(byte[] nvramArray) {
+		this.nvramArray = nvramArray;
+	}
 }

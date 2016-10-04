@@ -37,12 +37,15 @@ public class OCARM {
     };
     public static FakeLogger logger = new FakeLogger();
 
-	boolean traceInvocations = false;
+	private boolean traceInvocations = false;
 
-    public static OCARM instance = new OCARM();
+    public static final OCARM instance = new OCARM();
 
-    boolean shouldTraceInvocations() { return traceInvocations; }
+    public boolean shouldTraceInvocations() { return traceInvocations; }
 
+	public void setTraceInvocations(boolean traceInvocations) {
+		this.traceInvocations = traceInvocations;
+	}
 
     public static int padToWordLength(int i) {
     	return (i&3)!=0?(i&~3)+4:i;

@@ -1,6 +1,5 @@
 package name.bizna.jarm;
 
-
 public final class ByteArrayRegion extends ByteBackedRegion {
 
 	protected boolean allowWrites;
@@ -10,25 +9,25 @@ public final class ByteArrayRegion extends ByteBackedRegion {
 	/* Because of JVM limitations, size cannot be larger than 1GB. */
 	public ByteArrayRegion(long size, int accessLatency, boolean wide) {
 		super(accessLatency, wide);
-		assert(size <= (1 * 1024 * 1024 * 1024));
+		assert (size <= (1 * 1024 * 1024 * 1024));
 		this.allowWrites = true;
-		this.backing = new byte[(int)size];
+		this.backing = new byte[(int) size];
 	}
-	
+
 	public ByteArrayRegion(long size, int accessLatency) {
 		this(size, accessLatency, true);
 	}
-	
+
 	public ByteArrayRegion(long size) {
 		this(size, 1, true);
 	}
-	
+
 	public ByteArrayRegion(byte[] backing, boolean allowWrites, int accessLatency, boolean wide) {
 		super(accessLatency, wide);
 		this.allowWrites = allowWrites;
 		this.backing = backing;
 	}
-	
+
 	public ByteArrayRegion(byte[] backing, boolean allowWrites, int accessLatency) {
 		this(backing, allowWrites, accessLatency, true);
 	}
@@ -36,13 +35,18 @@ public final class ByteArrayRegion extends ByteBackedRegion {
 	public ByteArrayRegion(byte[] backing, boolean allowWrites) {
 		this(backing, allowWrites, 1, true);
 	}
-	
+
 	public ByteArrayRegion(byte[] backing) {
 		this(backing, true, 1, true);
 	}
 
-	public boolean isDirty() { return dirty; }
-	public void setDirty(boolean dirty) { this.dirty = dirty; }
+	public boolean isDirty() {
+		return dirty;
+	}
+
+	public void setDirty(boolean dirty) {
+		this.dirty = dirty;
+	}
 
 	@Override
 	public long getRegionSize() {
@@ -56,11 +60,12 @@ public final class ByteArrayRegion extends ByteBackedRegion {
 
 	@Override
 	public void backingWriteByte(int address, byte b) throws BusErrorException {
-		if(allowWrites) {
+		if (allowWrites) {
 			dirty = true;
 			backing[address] = b;
+		} else {
+			throw new BusErrorException("ByteArrayRegion is readonly: Requested address is " + address);
 		}
-		else throw new BusErrorException();
 	}
 
 	public byte[] getBackingArray() {

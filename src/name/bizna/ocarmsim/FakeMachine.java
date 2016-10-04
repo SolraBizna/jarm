@@ -1,11 +1,13 @@
 package name.bizna.ocarmsim;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
+import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
-
-import net.minecraft.nbt.NBTTagCompound;
+import javax.swing.JComponent;
 import li.cil.oc.api.machine.Architecture;
 import li.cil.oc.api.machine.Callback;
 import li.cil.oc.api.machine.Context;
@@ -17,11 +19,17 @@ import li.cil.oc.api.network.Component;
 import li.cil.oc.api.network.Message;
 import li.cil.oc.api.network.Network;
 import li.cil.oc.api.network.Node;
+import name.bizna.jarm.Debugger;
+import name.bizna.ocarmsim.components.SimComponent;
+import net.minecraft.nbt.NBTTagCompound;
 
 public class FakeMachine implements Machine {
-	
-	public static String computerAddress = "e521fbeb-b67d-434e-9295-40c31361e6f9";
+
 	private class MachineNode extends SimComponent {
+
+		public MachineNode(Machine machine, String address) {
+			super(machine, address);
+		}
 
 		@Override
 		public String name() {
@@ -29,15 +37,10 @@ public class FakeMachine implements Machine {
 		}
 
 		@Override
-		public String address() {
-			return computerAddress;
-		}
-		
-		@Override
 		public Network network() {
 			return network;
 		}
-		
+
 		@Callback
 		public Object[] start(Context ctx, Object[] args) {
 			return new Object[]{FakeMachine.this.start()};
@@ -52,39 +55,46 @@ public class FakeMachine implements Machine {
 		public Object[] isRunning(Context ctx, Object[] args) {
 			return new Object[]{FakeMachine.this.isRunning()};
 		}
-		
+
 		@Callback
 		public Object[] beep(Context ctx, Object[] args) {
-			if(args.length == 1 && args[0] instanceof String) {
-				FakeMachine.this.beep((String)args[0]);
-			}
-			else {
+			if (args.length == 1 && args[0] instanceof String) {
+				FakeMachine.this.beep((String) args[0]);
+			} else {
 				float freq = 200f;
 				float duration = 0.5f;
-				if(args.length >= 1 && args[0] instanceof Number)
-					freq = ((Number)args[0]).floatValue();
-				if(args.length >= 2 && args[1] instanceof Number)
-					duration = ((Number)args[1]).floatValue();
-				FakeMachine.this.beep((short)freq, (short)(duration * 20));
+				if (args.length >= 1 && args[0] instanceof Number) {
+					freq = ((Number) args[0]).floatValue();
+				}
+				if (args.length >= 2 && args[1] instanceof Number) {
+					duration = ((Number) args[1]).floatValue();
+				}
+				FakeMachine.this.beep((short) freq, (short) (duration * 20));
 			}
 			return new Object[]{};
 		}
 
-	}
-	private SimThread thread;
-	private MachineNode node = new MachineNode();
-	private FakeNetwork network = new FakeNetwork();
-	private Queue<Signal> signals = new ArrayBlockingQueue<Signal>(32);
-	private long startTime = System.currentTimeMillis();
+		@Override
+		public JComponent getUIComponent() {
+			return null;
+		}
 
-	FakeMachine() {
-		network.add(node);
+		@Override
+		public void reset() {
+			signals.clear();
+		}
+
 	}
-	
-	public void setThread(SimThread thread) {
-		this.thread = thread;
+	private final Debugger debugger;
+	private final MachineNode node = new MachineNode(this, UUID.randomUUID().toString());
+	private final FakeNetwork network = new FakeNetwork();
+	private final Queue<Signal> signals = new ArrayBlockingQueue<>(32);
+	private final long startTime = System.currentTimeMillis();
+
+	FakeMachine(Debugger debugger) {
+		this.debugger = debugger;
 	}
-	
+
 	@Override
 	public boolean canUpdate() {
 		// TODO Auto-generated method stub
@@ -146,9 +156,9 @@ public class FakeMachine implements Machine {
 	@Override
 	public boolean pause(double seconds) {
 		try {
-			Thread.sleep((long)(seconds * 1000));
+			Thread.sleep((long) (seconds * 1000));
+		} catch (InterruptedException e) {
 		}
-		catch(InterruptedException e) {}
 		return true;
 	}
 
@@ -160,12 +170,14 @@ public class FakeMachine implements Machine {
 
 	@Override
 	public boolean signal(String name, Object... args) {
-		synchronized(signals) {
+		if (OCARM.instance.shouldTraceInvocations()) {
+			OCARM.logger.info("signal pushed: %s", name);
+		}
+
+		synchronized (signals) {
 			signals.add(new SimSignal(name, args));
 		}
-		synchronized(thread) {
-			thread.notify();
-		}
+		debugger.onSignal(name, args);
 		return true;
 	}
 
@@ -189,15 +201,14 @@ public class FakeMachine implements Machine {
 
 	@Override
 	public Map<String, String> components() {
-		Map<String, String> ret = new HashMap<String, String>();
+		Map<String, String> ret = new HashMap<>();
 		network.populateComponentList(ret);
 		return ret;
 	}
 
 	@Override
 	public int componentCount() {
-		// TODO Auto-generated method stub
-		return 0;
+		return network.getNodeCount();
 	}
 
 	@Override
@@ -263,9 +274,18 @@ public class FakeMachine implements Machine {
 
 	@Override
 	public Signal popSignal() {
-		synchronized(signals) {
-			if(signals.isEmpty()) return null;
-			else return signals.poll();
+		synchronized (signals) {
+			if (signals.isEmpty()) {
+				OCARM.logger.info("signal poped: %s", "{none}");
+				return null;
+			} else {
+				Signal signal = signals.poll();
+				if (OCARM.instance.shouldTraceInvocations()) {
+					OCARM.logger.info("signal poped: %s", signal.name());
+				}
+
+				return signal;
+			}
 		}
 	}
 
@@ -279,8 +299,10 @@ public class FakeMachine implements Machine {
 	public Object[] invoke(String address, String method, Object[] args)
 			throws Exception {
 		Node n = network.node(address);
-		if(n == null || !(n instanceof Component)) throw new NoSuchMethodError();
-		return ((Component)n).invoke(method, this, args);
+		if (n == null || !(n instanceof Component)) {
+			throw new NoSuchMethodError();
+		}
+		return ((Component) n).invoke(method, this, args);
 	}
 
 	@Override
@@ -308,17 +330,27 @@ public class FakeMachine implements Machine {
 	@Override
 	public void load(NBTTagCompound nbt) {
 		// TODO Auto-generated method stub
-		
+
 	}
 
 	@Override
 	public void save(NBTTagCompound nbt) {
 		// TODO Auto-generated method stub
-		
+
 	}
-	
+
 	public void addNode(Node n) {
 		network.add(n);
 	}
 
+	List<SimComponent> getComponents() {
+		List<SimComponent> components = new ArrayList<>();
+		for (Node n : network.nodes()) {
+			if (n instanceof SimComponent) {
+				components.add((SimComponent) n);
+			}
+		}
+
+		return components;
+	}
 }

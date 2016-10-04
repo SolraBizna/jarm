@@ -1,35 +1,33 @@
 package name.bizna.ocarmsim.gdb;
 
+import java.awt.Component;
+import java.awt.event.ActionEvent;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import javax.swing.AbstractAction;
+import javax.swing.JButton;
+import javax.swing.JPanel;
 import name.bizna.jarm.BusErrorException;
-import name.bizna.jarm.CPU;
 import name.bizna.jarm.EscapeRetryException;
 import name.bizna.jarm.FPU;
+import name.bizna.ocarmsim.BasicDebugger;
+import name.bizna.ocarmsim.Breakpoint;
 import name.bizna.ocarmsim.OCARM;
-import name.bizna.ocarmsim.SimThread;
 
 /**
  *
  * @author Jean-Rémy Buchs <jrb0001@692b8c32.de>
  */
-public class GDBServer implements Runnable, AutoCloseable {
+public class GDBDebugger extends BasicDebugger {
 
 	private final boolean verbose;
 	private final ServerSocket serverSocket;
-	private final SimThread thread;
-	private final CPU cpu;
 	private final AtomicBoolean running = new AtomicBoolean(true);
 	private GDBSocket socket;
 
-	public GDBServer(int port, boolean verbose, SimThread thread, CPU cpu) {
+	public GDBDebugger(int port, boolean verbose) {
 		this.verbose = verbose;
-
-		this.thread = thread;
-		this.cpu = cpu;
 
 		try {
 			serverSocket = new ServerSocket(port);
@@ -93,6 +91,15 @@ public class GDBServer implements Runnable, AutoCloseable {
 						case 'c':
 							cont(new GDBCommandPacket('C', "00;" + packet.getData()));
 							break;
+						case 'z':
+							removePoint(packet);
+							break;
+						case 'Z':
+							addPoint(packet);
+							break;
+						case '!':
+							socket.write(new GDBPacket("OK"));
+							break;
 						default:
 							throw new RuntimeException("gdbserver: unknown command: " + packet.getCommand());
 					}
@@ -106,11 +113,6 @@ public class GDBServer implements Runnable, AutoCloseable {
 				ex.printStackTrace();
 			}
 		}
-	}
-
-	@Override
-	public void close() throws Exception {
-		running.set(false);
 	}
 
 	private char[] toHex(int number, int length) throws IOException {
@@ -145,14 +147,15 @@ public class GDBServer implements Runnable, AutoCloseable {
 	}
 
 	private int swapEndian(int i) {
-		return (i & 0xff) << 24 | (i & 0xff00) << 8 | (i & 0xff0000) >> 8 | (i >> 24) & 0xff;
+//		return (i & 0xff) << 24 | (i & 0xff00) << 8 | (i & 0xff0000) >> 8 | (i >> 24) & 0xff;
+		return i;
 	}
 
 	private void answerQuery(GDBCommandPacket packet) throws IOException {
 		String command = packet.getData().contains(":") ? packet.getData().substring(0, packet.getData().indexOf(':')) : packet.getData();
 		switch (command) {
 			case "Supported":
-				socket.write(new GDBPacket("multiprocess-"));
+				socket.write(new GDBPacket("multiprocess-;swbreak-;hwbreak+"));
 				break;
 			case "Attached":
 				socket.write(new GDBPacket("1"));
@@ -199,8 +202,9 @@ public class GDBServer implements Runnable, AutoCloseable {
 			case 12:
 			case 13:
 			case 14:
-			case 15:
 				return toHex(swapEndian(cpu.readRegister(register)), 4);
+			case 15:
+				return toHex(swapEndian(cpu.readCurrentPC()), 4);
 			case 16:
 			case 17:
 			case 18:
@@ -209,7 +213,7 @@ public class GDBServer implements Runnable, AutoCloseable {
 			case 21:
 			case 22:
 			case 23:
-				// TODO: checkx!
+				// TODO: check!
 				return new StringBuilder()
 						.append(toHex(swapEndian(((FPU) cpu.getCoprocessor(10)).readRegister((register - 16) * 3 + 0)), 4))
 						.append(toHex(swapEndian(((FPU) cpu.getCoprocessor(10)).readRegister((register - 16) * 3 + 1)), 4))
@@ -269,43 +273,35 @@ public class GDBServer implements Runnable, AutoCloseable {
 	}
 
 	private void readRegisters(GDBCommandPacket packet) throws IOException {
-		synchronized (thread) {
-			StringBuilder builder = new StringBuilder();
-			for (int i = 0; i < 16 + 8 + 2; i++) {
-				builder.append(readRegister(i));
-			}
-
-			socket.write(new GDBPacket(builder.toString()));
+		StringBuilder builder = new StringBuilder();
+		for (int i = 0; i < 16 + 8 + 2; i++) {
+			builder.append(readRegister(i));
 		}
+
+		socket.write(new GDBPacket(builder.toString()));
 	}
 
 	private void writeRegisters(GDBCommandPacket packet) throws IOException {
-		synchronized (thread) {
-			int offset = 0;
-			for (int i = 0; i < 16 + 8 + 2; i++) {
-				offset += writeRegister(i, packet.getData(), offset);
-			}
-
-			socket.write(new GDBPacket("OK"));
+		int offset = 0;
+		for (int i = 0; i < 16 + 8 + 2; i++) {
+			offset += writeRegister(i, packet.getData(), offset);
 		}
+
+		socket.write(new GDBPacket("OK"));
 	}
 
 	private void readRegister(GDBCommandPacket packet) throws IOException {
 		int reg = Integer.parseUnsignedInt(packet.getData(), 16);
 
-		synchronized (thread) {
-			socket.write(new GDBPacket(new String(readRegister(reg))));
-		}
+		socket.write(new GDBPacket(new String(readRegister(reg))));
 	}
 
 	private void writeRegister(GDBCommandPacket packet) throws IOException {
 		int reg = Integer.parseUnsignedInt(packet.getData().split("=")[0], 16);
 
-		synchronized (thread) {
-			writeRegister(reg, packet.getData().split("=")[1], 0);
+		writeRegister(reg, packet.getData().split("=")[1], 0);
 
-			socket.write(new GDBPacket("OK"));
-		}
+		socket.write(new GDBPacket("OK"));
 	}
 
 	private void readMemory(GDBCommandPacket packet) throws IOException {
@@ -313,18 +309,16 @@ public class GDBServer implements Runnable, AutoCloseable {
 		int length = Integer.parseUnsignedInt(packet.getData().split(",")[1], 16);
 		byte[] buffer = new byte[length];
 
-		synchronized (thread) {
-			try {
-				for (int i = 0; i < length; i++) {
-					buffer[i] = cpu.getVirtualMemorySpace().readByte(addr + i);
-				}
-
-				socket.write(new GDBPacket(new String(toHex(buffer))));
-			} catch (BusErrorException ex) {
-				socket.write(new GDBPacket(GDBError.MEMORY_ACCESS.message()));
-			} catch (EscapeRetryException ex) {
-				socket.write(new GDBPacket(GDBError.RETRY.message()));
+		try {
+			for (int i = 0; i < length; i++) {
+				buffer[i] = cpu.getVirtualMemorySpace().readByte(addr + i);
 			}
+
+			socket.write(new GDBPacket(new String(toHex(buffer))));
+		} catch (BusErrorException ex) {
+			socket.write(new GDBPacket(GDBError.MEMORY_ACCESS.message()));
+		} catch (EscapeRetryException ex) {
+			socket.write(new GDBPacket(GDBError.RETRY.message()));
 		}
 	}
 
@@ -332,45 +326,46 @@ public class GDBServer implements Runnable, AutoCloseable {
 		int addr = Integer.parseUnsignedInt(packet.getData().split(",")[0], 16);
 		int length = Integer.parseUnsignedInt(packet.getData().split(",")[1].split(":")[0], 16);
 
-		synchronized (thread) {
-			try {
-				char[] data = packet.getData().split(":")[1].toCharArray();
-				for (int i = 0; i < length; i++) {
-					byte value = Byte.parseByte(new String(new char[]{data[i * 2], data[i * 2 + 1]}), 16);
-					cpu.getVirtualMemorySpace().writeByte(addr, value);
-				}
-
-				socket.write(new GDBPacket("OK"));
-			} catch (BusErrorException ex) {
-				socket.write(new GDBPacket(GDBError.MEMORY_ACCESS.message()));
-			} catch (EscapeRetryException ex) {
-				socket.write(new GDBPacket(GDBError.RETRY.message()));
+		try {
+			char[] data = packet.getData().split(":")[1].toCharArray();
+			for (int i = 0; i < length; i++) {
+				byte value = Byte.parseByte(new String(new char[]{data[i * 2], data[i * 2 + 1]}), 16);
+				cpu.getVirtualMemorySpace().writeByte(addr, value);
 			}
+
+			socket.write(new GDBPacket("OK"));
+		} catch (BusErrorException ex) {
+			socket.write(new GDBPacket(GDBError.MEMORY_ACCESS.message()));
+		} catch (EscapeRetryException ex) {
+			socket.write(new GDBPacket(GDBError.RETRY.message()));
 		}
 	}
 
 	private int getCurrentSignal() {
-		switch (thread.getMode()) {
+		switch (getState()) {
 			case CRASHED:
 			case FAILED:
-			case RESETTING:
 				return 9;
+			case SLEEPING:
+				return 1;
 			case PAUSED:
 			case RUNNING:
-			case SLEEPING:
-			case STEPPING:
-				return 0;
+				return 5;
 			default:
-				throw new IllegalStateException("Unknown mode: " + thread.getMode());
+				throw new IllegalStateException("Unknown state: " + getState());
 		}
 	}
 
 	private void doV(GDBCommandPacket packet) throws IOException {
-		String command = packet.getData().contains(":") ? packet.getData().substring(0, packet.getData().indexOf(':')) : packet.getData();
+		String command = packet.getData().contains(";") ? packet.getData().substring(0, packet.getData().indexOf(';')) : packet.getData();
 		switch (command) {
 			case "Cont?":
 				// vCont not supported.
 				socket.write(new GDBPacket(""));
+				break;
+			case "Kill":
+				reset();
+				socket.write(new GDBPacket("OK"));
 				break;
 			default:
 				throw new RuntimeException("Unsupported v command: " + command);
@@ -379,37 +374,97 @@ public class GDBServer implements Runnable, AutoCloseable {
 
 	private void step(GDBCommandPacket packet) throws IOException {
 		int signal = Integer.parseUnsignedInt(packet.getData().split(";")[0], 16);
-		int addr = packet.getData().split(";").length > 1 && !packet.getData().split(";")[1].isEmpty() ? Integer.parseUnsignedInt(packet.getData().split(";")[1], 16) : cpu.readPC();
+		int addr = packet.getData().split(";").length > 1 && !packet.getData().split(";")[1].isEmpty() ? Integer.parseUnsignedInt(packet.getData().split(";")[1], 16) : cpu.readCurrentPC();
 
-		synchronized (thread) {
-			cpu.writePC(addr);
-			thread.step();
-		}
+		cpu.writePC(addr);
+		do {
+			step();
+		} while (getState() == State.RUNNING || getState() == State.SLEEPING);
 
 		socket.write(new GDBPacket("S" + new String(toHex(getCurrentSignal(), 1))));
 	}
 
 	private void cont(GDBCommandPacket packet) throws IOException {
 		int signal = Integer.parseUnsignedInt(packet.getData().split(";")[0], 16);
-		int addr = packet.getData().split(";").length > 1 && !packet.getData().split(";")[1].isEmpty() ? Integer.parseUnsignedInt(packet.getData().split(";")[1], 16) : cpu.readPC();
+		int addr = packet.getData().split(";").length > 1 && !packet.getData().split(";")[1].isEmpty() ? Integer.parseUnsignedInt(packet.getData().split(";")[1], 16) : cpu.readCurrentPC();
 
-		synchronized (thread) {
-			cpu.writePC(addr);
-			thread.go();
+		cpu.writePC(addr);
+		do {
+			go();
+		} while (getState() == State.RUNNING || getState() == State.SLEEPING);
+
+		socket.write(new GDBPacket("S" + new String(toHex(getCurrentSignal(), 1))));
+	}
+
+	private void removePoint(GDBCommandPacket packet) throws IOException {
+		int type = Integer.parseUnsignedInt(packet.getData().split(",")[0], 16);
+		int addr = Integer.parseUnsignedInt(packet.getData().split(",")[1], 16);
+		int size = Integer.parseUnsignedInt(packet.getData().split(",")[2], 16);
+
+		switch (type) {
+			case 0:
+			case 1:
+				removeBreakpoint(new Breakpoint(addr, size));
+				break;
+			case 2:
+				removeWriteWatchpoint(new Breakpoint(addr, size));
+				break;
+			case 3:
+				removeReadWatchpoint(new Breakpoint(addr, size));
+				break;
+			default:
+				throw new UnsupportedOperationException("Unsupported breakpoint type: " + type);
 		}
 
-		try {
-			while (thread.getMode() == SimThread.ExecutionMode.PAUSED) {
-				Thread.sleep(1);
-			}
+		socket.write(new GDBPacket("OK"));
+	}
 
-			while (thread.getMode() == SimThread.ExecutionMode.RUNNING) {
-				Thread.sleep(1);
-			}
+	private void addPoint(GDBCommandPacket packet) throws IOException {
+		int type = Integer.parseUnsignedInt(packet.getData().split(",")[0], 16);
+		int addr = Integer.parseUnsignedInt(packet.getData().split(",")[1], 16);
+		int size = Integer.parseUnsignedInt(packet.getData().split(",")[2], 16);
 
-			socket.write(new GDBPacket("S" + new String(toHex(getCurrentSignal(), 1))));
-		} catch (InterruptedException ex) {
-			Logger.getLogger(GDBServer.class.getName()).log(Level.SEVERE, null, ex);
+		switch (type) {
+			case 0:
+			case 1:
+				addBreakpoint(new Breakpoint(addr, size));
+				break;
+			case 2:
+				addWriteWatchpoint(new Breakpoint(addr, size));
+				break;
+			case 3:
+				addReadWatchpoint(new Breakpoint(addr, size));
+				break;
+			default:
+				throw new UnsupportedOperationException("Unsupported breakpoint type: " + type);
 		}
+
+		socket.write(new GDBPacket("OK"));
+	}
+
+	@Override
+	public Component getComponent() {
+		return new DebugPanel();
+	}
+
+	private class DebugPanel extends JPanel {
+
+		public DebugPanel() {
+			JButton resetButton = new JButton(new AbstractAction("Reset") {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					reset();
+				}
+			});
+			add(resetButton);
+			JButton pauseButton = new JButton(new AbstractAction("Pause") {
+				@Override
+				public void actionPerformed(ActionEvent e) {
+					pause();
+				}
+			});
+			add(pauseButton);
+		}
+
 	}
 }
