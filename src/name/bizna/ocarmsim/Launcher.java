@@ -91,9 +91,9 @@ public class Launcher {
 		System.err.println("    Specifies the port where the gdbserver should listen.");
 		System.err.println("  -gdbverbose");
 		System.err.println("    Specifies the port where the gdbserver should listen.");
-		System.err.println("    The parser that processes the command string is very simple. If you want complex argument escaping, consider making a shell script and executing that.");
 		System.err.println("  -addrinfocmd \"command to execute\"");
 		System.err.println("    Specifies an external command to use to map instruction addresses to useful information. The command should read hexadecimal addresses one line at a time, and output exactly one line of information for each line of input. (e.g. -addrinfocmd \"arm-none-eabi-addr2line -spfe path/to/unstripped_binary.elf\")");
+		System.err.println("    The parser that processes the command string is very simple. If you want complex argument escaping, consider making a shell script and executing that.");
 		System.err.println("hwdefinition:");
 		System.err.println("  Path to xml file with the hardware definition");
 	}
