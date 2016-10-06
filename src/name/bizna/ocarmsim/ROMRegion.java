@@ -3,7 +3,6 @@ package name.bizna.ocarmsim;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-
 import name.bizna.jarm.BusErrorException;
 import name.bizna.jarm.ByteBackedRegion;
 import name.bizna.jarm.EscapeRetryException;
@@ -13,8 +12,8 @@ public class ROMRegion extends ByteBackedRegion {
 	// cribbed from JARMArchitecture
 	private static final int ROM_MIN_BIT_DEPTH = 12; // 4K ROM
 	
-	byte[] array;
-	int arrayMask;
+	private final byte[] array;
+	private final int arrayMask;
 
 	ROMRegion(File inpath) throws IOException {
 		int arraySizeBits = ROM_MIN_BIT_DEPTH;
@@ -53,7 +52,7 @@ public class ROMRegion extends ByteBackedRegion {
 	@Override
 	public void backingWriteByte(int address, byte v) throws BusErrorException,
 			EscapeRetryException {
-		throw new BusErrorException();
+		throw new BusErrorException("ROM is readonly", address, BusErrorException.AccessType.WRITE);
 	}
 
 	@Override
@@ -61,4 +60,11 @@ public class ROMRegion extends ByteBackedRegion {
 		return 0x40000000;
 	}
 
+	public byte[] getArray() {
+		return array;
+	}
+
+	public int getArrayMask() {
+		return arrayMask;
+	}
 }
