@@ -733,5 +733,20 @@ public strictfp class FPU extends SaneCoprocessor {
 		FPEXC = 0;
 		FPSCR = FPSCR_IMPLEMENTED_SUBSET;
 	}
+
+	public int readRegister(int register) {
+		return registerBits[register];
+	}
 	
+	public void writeRegister(int register, int value){
+		registerBits[register] = value;
+	}
+
+	public int readFPSCR() {
+		return FPSCR;
+	}
+
+	public void writeFPSCR(int FPSCR) {
+		this.FPSCR = FPSCR;
+	}
 }

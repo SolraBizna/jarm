@@ -13,7 +13,6 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
-
 import li.cil.oc.api.machine.Callback;
 import li.cil.oc.api.machine.ExecutionResult;
 import li.cil.oc.api.machine.LimitReachedException;
@@ -1382,5 +1381,9 @@ public class CP3 extends SaneCoprocessor {
 	private void traceInvokeLimitReached() { OCARM.logger.info("  (reached call limit)"); }
 	private void traceInvokeReply(Integer status, Object[] result) {
 		OCARM.logger.info("  %d, %s", status, interchangeObjectToString(result));
+	}
+
+	public Machine getMachine() {
+		return machine;
 	}
 }

@@ -2,7 +2,6 @@ package name.bizna.ocarmsim;
 
 import java.util.HashMap;
 import java.util.Map;
-
 import li.cil.oc.api.network.Component;
 import li.cil.oc.api.network.Network;
 import li.cil.oc.api.network.Node;
@@ -86,4 +85,7 @@ public class FakeNetwork implements Network {
 		}
 	}
 
+	public int getNodeCount(){
+		return nodes.size();
+	}
 }
