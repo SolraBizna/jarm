@@ -750,9 +750,18 @@ public final class CPU {
 				case 20:
 					/* SMLALBB/SMLALBT/SMLALTB/SMLALTT (A8-626) */
 					throw new UnimplementedInstructionException(iword, "SMLALBB/SMLALBT/SMLALTB/SMLALTT");
-				case 22:
+				case 22: {
 					/* SMULBB/SMULBT/SMULTB/SMULTT (A8-644) */
-					throw new UnimplementedInstructionException(iword, "SMULBB/SMULBT/SMULTB/SMULTT");
+					int Rn = iword & 15;
+					int Rm = (iword>>8) & 15;
+					int Rd = (iword>>16) & 15;
+					int va, vb;
+					if((op2 & 2) != 0) va = readRegister(Rn)>>16;
+					else va = (short)readRegister(Rn);
+					if((op2 & 4) != 0) vb = readRegister(Rm)>>16;
+					else vb = (short)readRegister(Rm);
+					writeRegister(Rd, va*vb);
+				}
 				}
 				throw new UndefinedException();
 			}
