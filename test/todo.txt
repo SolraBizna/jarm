@@ -1,0 +1,8 @@
+-*- mode: outline; word-wrap: t -*-
+
+* Interrupts, hopefully including reset, don't forget SVC
+* Conditional execution (288)
+* Bitshifts (291)
+** (ARM) Register-based: ASR, LSL, LSR, ROR
+** (ARM,THUMB) LSL, LSR, ASR, ROR, RRX
+* Memory access (294): offset, pre-index, post-index
