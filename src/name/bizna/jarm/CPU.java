@@ -317,6 +317,7 @@ public final class CPU {
 	CP15 cp15;
 	public boolean inStrictAlignMode() { return (cp15.SCTLR & (1<<CP15.SCTLR_BIT_A)) != 0; }
 	/*** INITIALIZATION ***/
+	public CPU() { this(null); }
 	public CPU(Debugger debugger) {
 		this.debugger = debugger;
 		vm = new VirtualMemorySpace(mem, debugger);
