@@ -59,10 +59,8 @@ public class JarmTool {
 			f.read(headerReadArray);
 			/*** Read the Elf32_Ehdr ***/
 			/* EI_MAG0-3 = backspace, ELF */
-			if(headerReadBuf.getInt() != 0x7F454C46) {
-				System.err.println(pathstring+": Not an ELF file");
-				return null;
-			}
+			if(headerReadBuf.getInt() != 0x7F454C46)
+				throw new NonLoadableFileException("not an ELF file");
 			/* EI_CLASS = ELFCLASS32 */
 			if(headerReadBuf.get() != 1) throw new NonLoadableFileException("not 32-bit");
 			/* EI_DATA = ELFDATA2LSB or ELFDATA2MSB */
