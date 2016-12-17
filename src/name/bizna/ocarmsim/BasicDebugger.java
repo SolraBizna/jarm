@@ -27,9 +27,9 @@ public abstract class BasicDebugger extends Debugger implements Runnable {
 	private long sleep;
 	private String reason;
 	private boolean singleStep;
-	private final Set<Breakpoint> breakpoints = new HashSet<>();
-	private final Set<Breakpoint> readWatchpoints = new HashSet<>();
-	private final Set<Breakpoint> writeWatchpoints = new HashSet<>();
+	private final Set<Breakpoint> breakpoints = new HashSet<Breakpoint>();
+	private final Set<Breakpoint> readWatchpoints = new HashSet<Breakpoint>();
+	private final Set<Breakpoint> writeWatchpoints = new HashSet<Breakpoint>();
 
 	public synchronized void reset() {
 		// Reset CPU.
@@ -250,6 +250,10 @@ public abstract class BasicDebugger extends Debugger implements Runnable {
 	public synchronized void onSignal(String name, Object[] args) {
 		sleep = System.nanoTime();
 		notifyAll();
+	}
+	
+	public String getReason() {
+		return reason;
 	}
 
 	public abstract JComponent getGUIComponent();

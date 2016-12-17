@@ -32,6 +32,7 @@ import name.bizna.ocarmsim.BreakpointException;
  * @author Jean-Rémy Buchs <jrb0001@692b8c32.de>
  */
 public class CPUStatePanel extends JPanel {
+	public static final long serialVersionUID = 1;
 
 	private static final String[] gprNames = new String[]{" r0", " r1", " r2", " r3", " r4", " r5", " r6", " r7", " r8", " r9", "r10", "r11", "r12", " sp", " lr", " pc"};
 
@@ -78,7 +79,7 @@ public class CPUStatePanel extends JPanel {
 				final JLabel addrInfoLabel = new JLabel(" ");
 				panel.add(addrInfoLabel);
 
-				List<String> list = new ArrayList<>();
+				List<String> list = new ArrayList<String>();
 				Matcher m = Pattern.compile("([^\"]\\S*|\".+?\")\\s*").matcher(addrinfocmd);
 				while (m.find()) {
 					list.add(m.group(1).replace("\"", ""));
@@ -174,9 +175,11 @@ public class CPUStatePanel extends JPanel {
 					String nextInstr = "Error";
 					try {
 						nextInstr = String.format("%08X", debugger.getCpu().getVirtualMemorySpace().readInt(pc, true, false));
-					} catch (AlignmentException | BusErrorException | EscapeRetryException e) {
-					} catch (BreakpointException ignored) {
 					}
+					catch (AlignmentException ignored) {}
+					catch (BusErrorException ignored) {}
+					catch (EscapeRetryException ignored) {}
+					catch (BreakpointException ignored) {}
 					nextLabel.setText(String.format("Next instruction: %08X=%8s", pc, nextInstr));
 					stateLabel.setText(" State: " + debugger.getState().toString());
 					int cpsr = debugger.getCpu().readCPSR();

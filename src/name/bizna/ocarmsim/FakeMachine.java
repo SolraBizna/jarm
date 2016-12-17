@@ -88,7 +88,7 @@ public class FakeMachine implements Machine {
 	private final Debugger debugger;
 	private final MachineNode node = new MachineNode(this, UUID.randomUUID().toString());
 	private final FakeNetwork network = new FakeNetwork();
-	private final Queue<Signal> signals = new ArrayBlockingQueue<>(32);
+	private final Queue<Signal> signals = new ArrayBlockingQueue<Signal>(32);
 	private final long startTime = System.currentTimeMillis();
 
 	FakeMachine(Debugger debugger) {
@@ -201,7 +201,7 @@ public class FakeMachine implements Machine {
 
 	@Override
 	public Map<String, String> components() {
-		Map<String, String> ret = new HashMap<>();
+		Map<String, String> ret = new HashMap<String, String>();
 		network.populateComponentList(ret);
 		return ret;
 	}
@@ -346,7 +346,7 @@ public class FakeMachine implements Machine {
 	}
 
 	List<SimComponent> getComponents() {
-		List<SimComponent> components = new ArrayList<>();
+		List<SimComponent> components = new ArrayList<SimComponent>();
 		for (Node n : network.nodes()) {
 			if (n instanceof SimComponent) {
 				components.add((SimComponent) n);

@@ -32,7 +32,7 @@ public class CoredumpUtils {
 
 		ROMRegion romRegion = null;
 		SRAMRegion sramRegion = null;
-		final List<ByteArrayRegion> ramRegions = new ArrayList<>();
+		final List<ByteArrayRegion> ramRegions = new ArrayList<ByteArrayRegion>();
 		for (PhysicalMemorySpace.MappedRegion mappedRegion : cpu.getMemorySpace().getMappedRegions()) {
 			if (mappedRegion.getRegion() instanceof ROMRegion) {
 				romRegion = (ROMRegion) mappedRegion.getRegion();
@@ -55,7 +55,9 @@ public class CoredumpUtils {
 	private void dumpCore(OutputStream out, byte abi, byte abiVersion) throws IOException {
 		boolean E = cpu.isBigEndian();
 		ByteBuffer noteBuf = ByteBuffer.allocate(168);
-		try (WritableByteChannel channel = Channels.newChannel(out)) {
+		WritableByteChannel channel = null;
+		try {
+			channel = Channels.newChannel(out);
 			// PRSTATUS
 			/* Elf32_Nhdr */
 			noteBuf.putInt(swapInt(E, 5)); // n_namesz = strlen("CORE")+1
@@ -145,6 +147,9 @@ public class CoredumpUtils {
 					out.write(module.getBackingArray());
 				}
 			}
+		}
+		finally {
+			channel.close();
 		}
 	}
 

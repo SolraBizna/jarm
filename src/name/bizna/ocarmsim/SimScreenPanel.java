@@ -290,7 +290,7 @@ public class SimScreenPanel extends JComponent implements MouseInputListener, Ke
 		}
 		--x;
 		--y;
-		ArrayList<Object> list = new ArrayList<>();
+		ArrayList<Object> list = new ArrayList<Object>();
 		list.add(Character.valueOf(glyphs[x + y * cols]).toString());
 		short c = colors[x + y * cols];
 		int bg = (c & 255);
@@ -506,6 +506,18 @@ public class SimScreenPanel extends JComponent implements MouseInputListener, Ke
 	@Override
 	public void focusLost(FocusEvent arg0) {
 		repaint();
+	}
+	
+	public SimScreen getScreen() {
+		return screen;
+	}
+
+	public SimGPU getGPU() {
+		return gpu;
+	}
+	
+	public SimKeyboard getKeyboard() {
+		return keyboard;
 	}
 
 	// http://www.jpct.net/forum2/index.php?topic=749.0
