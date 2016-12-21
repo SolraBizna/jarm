@@ -161,9 +161,9 @@ public final class CPU {
 		cur_lr = newMode.lrIndex;
 		mode = newMode;
 	}
-	private void setProcessorMode(int newModeRep) {
+	private void setProcessorMode(int newModeRep) throws UndefinedException {
 		ProcessorMode newMode = ProcessorMode.getModeFromRepresentation(newModeRep);
-		if(newMode == null) throw new NullPointerException();
+		if(newMode == null) throw new UndefinedException();
 		setProcessorMode(newMode);
 	}
 	private void enterProcessorModeByException(ProcessorMode newMode) {
@@ -197,9 +197,13 @@ public final class CPU {
 	public boolean isLittleEndian() { return (cpsr & (1<<CPSR_BIT_E)) == 0; }
 	public boolean isBigEndian() { return (cpsr & (1<<CPSR_BIT_E)) != 0; }
 	public boolean isPrivileged() { return mode.privileged; }
+	public boolean usingStrictAlignment() { return (cpsr & (1<<CPSR_BIT_A)) != 0; }
+	public boolean areIRQsEnabled() { return (cpsr & (1<<CPSR_BIT_I)) != 0; }
+	public boolean areFIQsEnabled() { return (cpsr & (1<<CPSR_BIT_F)) != 0; }
+	public int getMode() { return cpsr & 31; }
 	public void writeCPSR(int value) { cpsr = value; }
 	public int readCPSR() { return cpsr; }
-	private void instrWriteCurCPSR(int value, int mask, boolean isExceptionReturn) {
+	private void instrWriteCurCPSR(int value, int mask, boolean isExceptionReturn) throws UndefinedException {
 		/* (B1-1153) */
 		int writeMask = 0;
 		if((mask & 8) != 0) {
@@ -735,7 +739,8 @@ public final class CPU {
 					switch(op) {
 					case 1:
 						/* BKPT (A8-346) */
-						throw new UnimplementedInstructionException(iword, "BKPT");
+						/* TODO: Invasive debugging mode */
+						return;
 					case 2:
 						/* HVC (B9-1984) but we do NOT have Virtualization Extensions */
 					case 3:
@@ -1493,6 +1498,115 @@ public final class CPU {
 		switch((iword >> 26) & 3) {
 		case 0: case 1:
 			/* TODO: Memory hints, Advanced SIMD instructions, and miscellaneous instructions (A5-217) */
+			int op1 = (iword >> 20) & 127;
+			int op2 = (iword >> 4) & 15;
+			int Rn = (iword >> 16) & 15;
+			switch(op1) {
+			case 16:
+				if((Rn&1) == 0) {
+					if((op2&2) == 0) {
+						/* CPS (B9-1980) */
+						if(!mode.privileged) return; // act as NOP
+						switch(Rn&12) {
+						case 8:
+							cpsr = cpsr | (iword & 0x1C0);
+							break;
+						case 12:
+							cpsr = cpsr & (~0 ^ (iword & 0x1C0));
+							break;
+						}
+						if((Rn&2) == 2) {
+							setProcessorMode(iword & 0x1F);
+						}
+						return;
+					}
+				}
+				else {
+					if(op2 == 0) {
+						/* SETEND (A8-604) */
+						throw new UnimplementedInstructionException(iword, "SETEND");
+					}
+				}
+				break;
+			case 18:
+				if(op2 == 7) {
+					/* Unpredictable? Why would you SPECIFICALLY encode Unpredictable?!!?! */
+				}
+				break;
+			case 64:
+			case 66:
+			case 68:
+			case 70:
+			case 72:
+			case 74:
+			case 76:
+			case 78:
+				/* Advanced SIMD element or structure load/store instructions (A7-275) */
+				throw new UnimplementedInstructionException(iword, "A7-275");
+			case 97:
+			case 105:
+				/* Unallocated memory hint (treat as NOP) */
+				if((op2&1) == 0) return;
+			case 65:
+			case 73:
+				/* Unallocated memory hint (treat as NOP) */
+				return;
+			case 69:
+			case 77:
+				/* Preload Instruction (A8-530) */
+				throw new UnimplementedInstructionException(iword, "PLI");
+			/* 0b100xx11 = unpredictable */
+			case 81:
+			case 85:
+			case 89:
+			case 93:
+				/* PLD, PLDW (A8-524) */
+				throw new UnimplementedInstructionException(iword, "PLD/PLDW");
+			case 87:
+				switch(op2) {
+				case 1:
+					/* CLREX (A8-360) */
+					/* We have no multiprocessing, so this is a no-op */
+					return;
+				case 4:
+					/* DSB (A8-380) */
+					throw new UnimplementedInstructionException(iword, "DSB");
+				case 5:
+					/* DMB (A8-378) */
+					/* We have no multiprocessing, so this is a no-op */
+					return;
+				case 6:
+					/* ISB (A8-389) */
+					throw new UnimplementedInstructionException(iword, "ISB");
+				}
+				break;
+			case 101:
+			case 109:
+				if((op2 & 1) == 0) {
+					/* PLI (A8-532) */
+					throw new UnimplementedInstructionException(iword, "PLI");
+				}
+				break;
+			case 113:
+			case 117:
+			case 121:
+			case 125:
+				if((op2 & 1) == 0) {
+					/* PLD (A8-528) */
+					throw new UnimplementedInstructionException(iword, "PLD/PLDW");
+				}
+				break;
+			case 127:
+				if(op2 == 15) {
+					/* Permanently UNDEFINED */
+					throw new UndefinedException();
+				}
+			default:
+				if((op1 & 96) == 32) {
+					/* Advanced SIMD data-processing intructions (A7-261) */
+					throw new UnimplementedInstructionException(iword, "A7-261");
+				}
+			}
 			break;
 		case 2:
 			if(((iword >> 25) & 1) == 0) {
@@ -1506,10 +1620,10 @@ public final class CPU {
 			}
 			else {
 				/* BLX (A8-348) */
-				int imm32 = (iword << 8 >> 6) | ((iword >> 23) & 2) | 1;
+				int imm32 = (iword << 8 >> 6) | (iword << 7 >> 7) | 1;
 				writeLR(readPC()-4);
 				// always switches instruction sets; set the low bit to achieve Thumb enlightenment
-				interworkingBranch(((readPC()&~3)+imm32)|1);
+				interworkingBranch((readPC()&~3)+imm32);
 				return;
 			}
 			break;

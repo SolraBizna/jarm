@@ -1,4 +1,3 @@
-# ADC immediate, input carry SET, output carry STILL SET
 r1:=64
 C:=1
 

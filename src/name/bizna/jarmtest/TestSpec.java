@@ -21,8 +21,8 @@ public class TestSpec {
 	private static enum Token {
 		WHITESPACE("^[ \t]+"),
 		IDENTIFIER("^[_a-zA-Z][_a-zA-Z0-9]*"),
-		ARRAY_ACCESS("^\\[(\\-?(?:0x[0-9A-FA-f]+|[0-9]+))\\]"),
-		NUMBER("\\-?(?:0x[0-9A-FA-f]+|[0-9]+)"),
+		ARRAY_ACCESS("^\\[(0x[0-9A-FA-f]+|\\-?[0-9]+)\\]"),
+		NUMBER("^0x[0-9A-Fa-f]+|\\-?[0-9]+"),
 		ASSIGNMENT("^:="),
 		EQUALITY("^==");
 		private final Pattern p;
@@ -90,6 +90,8 @@ public class TestSpec {
 		protected LValue left;
 		protected RValue right;
 		public Assignment(LValue left, RValue right) {
+			assert(left != null);
+			assert(right != null);
 			this.left = left;
 			this.right = right;
 		}
@@ -104,6 +106,8 @@ public class TestSpec {
 	private static abstract class Check {
 		protected RValue left, right;
 		protected Check(RValue left, RValue right) {
+			assert(left != null);
+			assert(right != null);
 			this.left = left;
 			this.right = right;
 		}
@@ -149,13 +153,13 @@ public class TestSpec {
 					case IDENTIFIER:
 						String lvalueID = p.getParsedResult().group(0);
 						if(p.parseNextToken()) {
-							LValue lvalue;
+							RValue lvalue;
 							if(p.getParsedToken() == Token.ARRAY_ACCESS) {
-								lvalue = LValue.make(lvalueID, p.getParsedResult().group(1));
+								lvalue = RValue.make(lvalueID, p.getParsedResult().group(1));
 								p.parseNextToken();
 							}
 							else {
-								lvalue = LValue.make(lvalueID);
+								lvalue = RValue.make(lvalueID);
 								if(lvalueID.equals("quitReason")) sawQuitReasonCompareLeft = true;
 							}
 							validLine = validLine && lvalue != null;
@@ -184,9 +188,13 @@ public class TestSpec {
 									default:
 										validLine = false;
 									}
+									validLine = validLine && rvalue != null;
 									if(validLine) switch(op) {
 									case ASSIGNMENT:
-										assignments.add(new Assignment(lvalue, rvalue));
+										if(!(lvalue instanceof LValue))
+											validLine = false;
+										else
+											assignments.add(new Assignment((LValue)lvalue, rvalue));
 										break;
 									case EQUALITY:
 										checks.add(new EqualityCheck(lvalue, rvalue));

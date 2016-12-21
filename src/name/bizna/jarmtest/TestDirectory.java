@@ -16,6 +16,7 @@ import name.bizna.jarm.ByteArrayRegion;
 import name.bizna.jarm.CPU;
 import name.bizna.jarm.PhysicalMemorySpace;
 import name.bizna.jarm.UndefinedException;
+import name.bizna.jarm.UnimplementedInstructionException;
 import name.bizna.jarmtest.TestSpec.InvalidSpecException;
 
 public class TestDirectory {
@@ -178,33 +179,43 @@ public class TestDirectory {
 	public static boolean isValidTestDir(File dir) {
 		return new File(dir, CODE_FILENAME).exists();
 	}
-	public boolean runTestWithSpec(CPU cpu, File specFile, String specId, List<String> subtestFailureList) throws NonLoadableFileException {
-		TestSpec spec;
+	public boolean runTestWithSpec(CPU cpu, File specFile, String specId, List<String> subtestFailureList) {
 		try {
-			spec = new TestSpec(specFile);
+			TestSpec spec;
+			try {
+				spec = new TestSpec(specFile);
+			}
+			catch(InvalidSpecException e) {
+				throw new NonLoadableFileException("invalid spec", specId);
+			}
+			catch(EOFException e) {
+				throw new NonLoadableFileException("unexpected EOF", specId);
+			}
+			catch(FileNotFoundException e) {
+				throw new NonLoadableFileException("file not found", specId);
+			}
+			catch(IOException e) {
+				throw new NonLoadableFileException("IO error", specId);
+			}
+			spec.applyInitialStateAndReset(cpu, littleEndian);
+			if(hasEntryPoint) cpu.loadPC(entryPoint);
+			cpu.zeroBudget(false);
+			try {
+				cpu.execute(1<<30);
+			}
+			catch(BusErrorException e) { /* NOTREACHED */ }
+			catch(AlignmentException e) { /* NOTREACHED */ }
+			catch(UndefinedException e) { /* NOTREACHED */ }
+			catch(UnimplementedInstructionException e) {
+				e.printStackTrace();
+				((CP7)cpu.getCoprocessor(7)).setQuitReason(9);
+			}
+			return spec.checkFinalState(cpu, subtestFailureList);
 		}
-		catch(InvalidSpecException e) {
-			throw new NonLoadableFileException("invalid spec", specId);
+		catch(NonLoadableFileException e) {
+			subtestFailureList.add(e.getIdentifier() + " (parse error in spec)");
+			return false;
 		}
-		catch(EOFException e) {
-			throw new NonLoadableFileException("unexpected EOF", specId);
-		}
-		catch(FileNotFoundException e) {
-			throw new NonLoadableFileException("file not found", specId);
-		}
-		catch(IOException e) {
-			throw new NonLoadableFileException("IO error", specId);
-		}
-		spec.applyInitialStateAndReset(cpu, littleEndian);
-		if(hasEntryPoint) cpu.loadPC(entryPoint);
-		cpu.zeroBudget(false);
-		try {
-			cpu.execute(1<<30);
-		}
-		catch(BusErrorException e) { /* NOTREACHED */ }
-		catch(AlignmentException e) { /* NOTREACHED */ }
-		catch(UndefinedException e) { /* NOTREACHED */ }
-		return spec.checkFinalState(cpu, subtestFailureList);
 	}
 	public boolean runTest(CPU cpu, List<String> failureList) {
 		boolean success = true;
@@ -248,12 +259,10 @@ public class TestDirectory {
 						}
 					}
 				}
-				
 			}
 			catch(NonLoadableFileException e) {
-				System.err.println(e.getIdentifier()+": Not loadable: "+e.getWay());
-				failureList.add(e.getIdentifier());
-				success = false;
+				failureList.add(e.getIdentifier() + " (non-loadable ELF: "+e.getWay()+")");
+				return false;
 			}
 		}
 		return success;

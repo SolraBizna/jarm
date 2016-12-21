@@ -5,10 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import name.bizna.jarm.BusErrorException;
 import name.bizna.jarm.CPU;
-import name.bizna.jarm.Debugger;
-import name.bizna.jarm.EscapeRetryException;
 
 public class JarmTest {
 	

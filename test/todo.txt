@@ -2,7 +2,9 @@
 
 * Interrupts, hopefully including reset, don't forget SVC
 * Conditional execution (288)
-* Bitshifts (291)
-** (ARM) Register-based: ASR, LSL, LSR, ROR
-** (ARM,THUMB) LSL, LSR, ASR, ROR, RRX
 * Memory access (294): offset, pre-index, post-index
+* conditions (N, Z, C, V)
+* A8-348 BLX (Thumb mode not implemented yet)
+* A8-350 BLX (Register; Thumb mode not implemented yet)
+* A8-352 BX (Register; Thumb mode not implemented yet)
+* A8-354 BXJ (Thumb mode not implemented yet, nor is Jazelle mode)

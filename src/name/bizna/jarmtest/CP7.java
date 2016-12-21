@@ -81,4 +81,8 @@ public class CP7 extends SaneCoprocessor {
 		return quitReason;
 	}
 
+	public void setQuitReason(int i) {
+		quitReason = i;
+	}
+
 }

@@ -1,3 +1,4 @@
+        .syntax unified
         .text
         .code 32
 
