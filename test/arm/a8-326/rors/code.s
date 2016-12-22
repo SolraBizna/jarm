@@ -6,7 +6,7 @@
         .global _start
         .func _start
 _start:
-        ANDS r0, r1, r2, ROR #1
+        ANDS r0, r1, r2, RRX
         CDP p7, 0, cr0, cr0, cr0, #0
         .endfunc
 

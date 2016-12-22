@@ -1570,14 +1570,16 @@ public final class CPU {
 					return;
 				case 4:
 					/* DSB (A8-380) */
-					throw new UnimplementedInstructionException(iword, "DSB");
+					/* We have no multiprocessing, so this is a no-op */
+					return;
 				case 5:
 					/* DMB (A8-378) */
 					/* We have no multiprocessing, so this is a no-op */
 					return;
 				case 6:
 					/* ISB (A8-389) */
-					throw new UnimplementedInstructionException(iword, "ISB");
+					/* TODO: When MMU / JIT are implemented, this will be important */
+					return;
 				}
 				break;
 			case 101:
