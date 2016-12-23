@@ -69,6 +69,7 @@ public final class CPU {
 	private static final int CPSR_MASK_M = 0x1F;
 	private static final int APSR_READ_MASK = 0xF80F0100;
 	private static final int APSR_WRITE_MASK = 0xF80F0000;
+	private static final int CPSR_USER_READ_MASK = 0xF8FFF3DF;
 	private static final int CPSR_READ_MASK = 0xFFFFFFFF;
 	/* the ARM ARM ARM says we should be able to write the E bit this way but also deprecates it
 	 * we'll let them write it because it costs us nothing
@@ -659,7 +660,7 @@ public final class CPU {
 		else {
 			if((op2 & 8) == 0) {
 				/* Miscellaneous instructions (A5-207) */
-				int op = (op1 >> 1) & 3;
+				int op = (iword >> 21) & 3;
 				op1 = (iword >> 16) & 15;
 				/* op2 is still good */
 				switch(op2) {
@@ -667,27 +668,47 @@ public final class CPU {
 					if((iword & 512) != 0) {
 						if((op & 1) == 0) {
 							/* MRS (banked register, B9-1992) */
-							throw new UnimplementedInstructionException(iword, "MRS");
+							/* We don't have Virtualization extensions */
+							throw new UndefinedException();
 						}
 						else {
 							/* MSR (banked register, B9-1994) */
-							throw new UnimplementedInstructionException(iword, "MSR");
+							/* We don't have Virtualization extensions */
+							throw new UndefinedException();
 						}
 					}
 					else {
 						switch(op) {
-						case 0: case 2:
+						case 0: case 2: {
 							/* MRS (A8-496, B9-1990) */
-							throw new UnimplementedInstructionException(iword, "MRS");
-						case 1:
-							if((op1 & 3) == 0) {
-								/* MSR (register, A8-500) */
-								throw new UnimplementedInstructionException(iword, "MSR");
+							boolean readSPSR = (op & 2) != 0;
+							int Rd = (iword >> 12) & 15;
+							if(readSPSR) {
+								if(mode == ProcessorMode.USER || mode == ProcessorMode.SYSTEM)
+									throw new UndefinedException();
+								writeRegister(Rd, spsr[mode.spsrIndex]);
+								return;
 							}
-							/* fall through */
+							else {
+								int red = cpsr;
+								if(mode == ProcessorMode.USER) red &= CPSR_USER_READ_MASK;
+								writeRegister(Rd, red);
+								return;
+							}
+						}
+						case 1:
 						case 3:
-							/* MSR (register, B9-1998) */
-							throw new UnimplementedInstructionException(iword, "MSR");
+							/* MSR (register, A8-500, B9-1998) */
+							int mask = (iword >> 16) & 15;
+							boolean writingSPSR = (op & 2) != 0;
+							if(writingSPSR || ((mask & 3) == 1) || ((mask & 2) != 0))
+								if(!isPrivileged()) throw new UndefinedException();
+							int imm32 = expandARMImmediate(iword & 4095);
+							if(writingSPSR)
+								instrWriteCurSPSR(imm32, mask);
+							else
+								instrWriteCurCPSR(imm32, mask, false);
+							return;
 						}
 					}
 					break;
@@ -1281,7 +1302,17 @@ public final class CPU {
 					if(op1 == 0) {
 						if((op2 & 1) == 0) {
 							/* PKH (A8-522) */
-							throw new UnimplementedInstructionException(iword, "PKH");
+							int Rn_real = (iword >> 16) & 15;
+							int Rd = (iword >> 12) & 15;
+							int Rm = iword & 15;
+							boolean isTB = (iword&64)!=0;
+							int m = applyIRShift(readRegister(Rm), isTB ? 2 : 0, (iword>>7)&31);
+							int n = readRegister(Rn_real);
+							if(isTB)
+								writeRegister(Rd, (m&0x0000FFFF)|(n&0xFFFF0000));
+							else
+								writeRegister(Rd, (m&0xFFFF0000)|(n&0x0000FFFF));
+							return;
 						}
 						else if(op2 == 3) {
 							if(Radd != 15) {
@@ -1554,14 +1585,16 @@ public final class CPU {
 			case 69:
 			case 77:
 				/* Preload Instruction (A8-530) */
-				throw new UnimplementedInstructionException(iword, "PLI");
+				/* TODO: When MMU is implemented, preload the page table cache */
+				/* TODO: When JIT is implemented, discard the instruction cace */
 			/* 0b100xx11 = unpredictable */
 			case 81:
 			case 85:
 			case 89:
 			case 93:
 				/* PLD, PLDW (A8-524) */
-				throw new UnimplementedInstructionException(iword, "PLD/PLDW");
+				/* TODO: When MMU is implemented, preload the page table cache */
+				break;
 			case 87:
 				switch(op2) {
 				case 1:
