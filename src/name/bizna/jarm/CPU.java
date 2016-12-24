@@ -748,7 +748,28 @@ public final class CPU {
 					break;
 				case 5:
 					/* Saturating addition and subtraction (A5-202) */
-					throw new UnimplementedInstructionException(iword, "saturating addition / subtraction");
+					/* QADD/QSUB/QDADD/QDSUB (A8-540 and change) */
+					boolean subtract = (op & 1) != 0;
+					boolean doubleTrouble = (op & 2) != 0;
+					int Rm = iword&15;
+					int Rn = (iword>>16)&15;
+					int Rd = (iword>>12)&15;
+					long n = readRegister(Rn);
+					if(doubleTrouble) n *= 2L; // why only n? WHO KNOWS
+					long m = readRegister(Rm);
+					long result;
+					if(subtract) result = n - m;
+					else result = n + m;
+					if(result > 0x7FFFFFFFL) {
+						writeRegister(Rd, 0x7FFFFFFF);
+						cpsr |= 1<<CPSR_BIT_Q;
+					}
+					else if(result < -0x80000000L) {
+						writeRegister(Rd, 0x80000000);
+						cpsr |= 1<<CPSR_BIT_Q;
+					}
+					else writeRegister(Rd, (int)result);
+					return;
 				case 6:
 					switch(op) {
 					case 3:
@@ -1355,11 +1376,17 @@ public final class CPU {
 							/* the unsigned/signed symmetry breaks down here */
 							if(!unsigned) {
 								/* REV (A8-562) */
-								throw new UnimplementedInstructionException(iword, "REV");
+								int Rm = iword&15;
+								int Rd = (iword>>12)&15;
+								writeRegister(Rd, Integer.reverseBytes(readRegister(Rm)));
+								return;
 							}
 							else {
 								/* RBIT (A8-560) */
-								throw new UnimplementedInstructionException(iword, "RBIT");
+								int Rm = iword&15;
+								int Rd = (iword>>12)&15;
+								writeRegister(Rd, Integer.reverse(readRegister(Rm)));
+								return;
 							}
 						case 0x33: {
 							/* SXTAH (A8-728), UXTAH (A8-810) */
@@ -1376,11 +1403,18 @@ public final class CPU {
 							/* breaks down here too */
 							if(!unsigned) {
 								/* REV16 (A8-564) */
-								throw new UnimplementedInstructionException(iword, "REV16");
+								int Rm = iword&15;
+								int Rd = (iword>>12)&15;
+								writeRegister(Rd, (Short.reverseBytes((short)readRegister(Rm))&0xFFFF)
+										|(Short.reverseBytes((short)(readRegister(Rm)>>16))<<16));
+								return;
 							}
 							else {
 								/* REVSH (A8-566) */
-								throw new UnimplementedInstructionException(iword, "REVSH");
+								int Rm = iword&15;
+								int Rd = (iword>>12)&15;
+								writeRegister(Rd, Short.reverseBytes((short)readRegister(Rm)));
+								return;
 							}
 						default:
 							if((op1 & 6) == 2 && (op2 & 1) == 0) {
@@ -1396,25 +1430,224 @@ public final class CPU {
 					boolean unsigned = (op1 & 4) != 0;
 					boolean saturate = (op1 & 3) == 2;
 					boolean half = (op1 & 3) == 3;
+					int Rn_real = (iword>>16)&15;
+					int Rd = (iword>>12)&15;
+					int Rm = iword&15;
+					int n = readRegister(Rn_real);
+					int m = readRegister(Rm);
 					switch(op2) {
-					case 0:
+					case 0: {
 						/* SADD16 (A8-586), QADD16 (A8-542), SHADD16 (A5-608), UADD16 (A8-750), UQADD16 (A8-780), UHADD16 (A8-762) */
-						throw new UnimplementedInstructionException(iword, "*ADD16");
-					case 1:
+						int loN = (short)n;
+						int hiN = (short)(n>>16);
+						int loM = (short)m;
+						int hiM = (short)(m>>16);
+						if(unsigned) {
+							loN &= 0xFFFF;
+							hiN &= 0xFFFF;
+							loM &= 0xFFFF;
+							hiM &= 0xFFFF;
+						}
+						int loD = loN + loM;
+						int hiD = hiN + hiM;
+						if(half) {
+							loD >>= 1;
+							hiD >>= 1;
+						}
+						if(saturate) {
+							if(unsigned) {
+								loD = clamp(loD, 0, 0xFFFF);
+								hiD = clamp(hiD, 0, 0xFFFF);
+							}
+							else {
+								loD = clamp(loD, -0x8000, 0x7FFF);
+								hiD = clamp(hiD, -0x8000, 0x7FFF);
+							}
+						}
+						writeRegister(Rd, (loD&0xFFFF)|(hiD<<16));
+					} return;
+					case 1: {
 						/* SASX (A8-590), QASX (A8-546), SHASX (A8-612), UASX (A8-754), UQASX (A8-784), UHASX (A8-766) */
-						throw new UnimplementedInstructionException(iword, "*ASX");
-					case 2:
+						int loN = (short)n;
+						int hiN = (short)(n>>16);
+						int loM = (short)m;
+						int hiM = (short)(m>>16);
+						if(unsigned) {
+							loN &= 0xFFFF;
+							hiN &= 0xFFFF;
+							loM &= 0xFFFF;
+							hiM &= 0xFFFF;
+						}
+						int loD = loN - hiM;
+						int hiD = hiN + loM;
+						if(half) {
+							loD >>= 1;
+							hiD >>= 1;
+						}
+						if(saturate) {
+							if(unsigned) {
+								loD = clamp(loD, 0, 0xFFFF);
+								hiD = clamp(hiD, 0, 0xFFFF);
+							}
+							else {
+								loD = clamp(loD, -0x8000, 0x7FFF);
+								hiD = clamp(hiD, -0x8000, 0x7FFF);
+							}
+						}
+						writeRegister(Rd, (loD&0xFFFF)|(hiD<<16));
+					} return;
+					case 2: {
 						/* SSAX (A8-656), QSAX (A8-552), SHSAX (A8-614), USAX (A8-800), UQSAX (A8-786), UHSAX (A8-768) */
-						throw new UnimplementedInstructionException(iword, "*SAX");
-					case 3:
+						int loN = (short)n;
+						int hiN = (short)(n>>16);
+						int loM = (short)m;
+						int hiM = (short)(m>>16);
+						if(unsigned) {
+							loN &= 0xFFFF;
+							hiN &= 0xFFFF;
+							loM &= 0xFFFF;
+							hiM &= 0xFFFF;
+						}
+						int loD = loN + hiM;
+						int hiD = hiN - loM;
+						if(half) {
+							loD >>= 1;
+							hiD >>= 1;
+						}
+						if(saturate) {
+							if(unsigned) {
+								loD = clamp(loD, 0, 0xFFFF);
+								hiD = clamp(hiD, 0, 0xFFFF);
+							}
+							else {
+								loD = clamp(loD, -0x8000, 0x7FFF);
+								hiD = clamp(hiD, -0x8000, 0x7FFF);
+							}
+						}
+						writeRegister(Rd, (loD&0xFFFF)|(hiD<<16));
+					} return;
+					case 3: {
 						/* SSUB16 (A8-658), QSUB16 (A8-556), SHSUB16 (A8-616), USUB16 (A8-802), UQSUB16 (A8-788), UHSUB16 (A8-770) */
-						throw new UnimplementedInstructionException(iword, "*SUB16");
-					case 4:
+						int loN = (short)n;
+						int hiN = (short)(n>>16);
+						int loM = (short)m;
+						int hiM = (short)(m>>16);
+						if(unsigned) {
+							loN &= 0xFFFF;
+							hiN &= 0xFFFF;
+							loM &= 0xFFFF;
+							hiM &= 0xFFFF;
+						}
+						int loD = loN - loM;
+						int hiD = hiN - hiM;
+						if(half) {
+							loD >>= 1;
+							hiD >>= 1;
+						}
+						if(saturate) {
+							if(unsigned) {
+								loD = clamp(loD, 0, 0xFFFF);
+								hiD = clamp(hiD, 0, 0xFFFF);
+							}
+							else {
+								loD = clamp(loD, -0x8000, 0x7FFF);
+								hiD = clamp(hiD, -0x8000, 0x7FFF);
+							}
+						}
+						writeRegister(Rd, (loD&0xFFFF)|(hiD<<16));
+					} return;
+					case 4: {
 						/* SADD8 (A8-588), QADD8 (A8-544), SHADD8 (A8-610), UADD8 (A8-752), UQADD8 (A8-782), UHADD8 (A8-764) */
-						throw new UnimplementedInstructionException(iword, "*ADD8");
-					case 7:
+						int n0 = (byte)n;
+						int n1 = (byte)(n>>8);
+						int n2 = (byte)(n>>16);
+						int n3 = (byte)(n>>24);
+						int m0 = (byte)m;
+						int m1 = (byte)(m>>8);
+						int m2 = (byte)(m>>16);
+						int m3 = (byte)(m>>24);
+						if(unsigned) {
+							n0 &= 0xFF;
+							n1 &= 0xFF;
+							n2 &= 0xFF;
+							n3 &= 0xFF;
+							m0 &= 0xFF;
+							m1 &= 0xFF;
+							m2 &= 0xFF;
+							m3 &= 0xFF;
+						}
+						int d0 = n0+m0;
+						int d1 = n1+m1;
+						int d2 = n2+m2;
+						int d3 = n3+m3;
+						if(half) {
+							d0 >>= 1;
+							d1 >>= 1;
+							d2 >>= 1;
+							d3 >>= 1;
+						}
+						if(saturate) {
+							if(unsigned) {
+								d0 = clamp(d0, 0, 0xFF);
+								d1 = clamp(d1, 0, 0xFF);
+								d2 = clamp(d2, 0, 0xFF);
+								d3 = clamp(d3, 0, 0xFF);
+							}
+							else {
+								d0 = clamp(d0, -0x80, 0x7F);
+								d1 = clamp(d1, -0x80, 0x7F);
+								d2 = clamp(d2, -0x80, 0x7F);
+								d3 = clamp(d3, -0x80, 0x7F);
+							}
+						}
+						writeRegister(Rd, (d0&0xFF)|((d1&0xFF)<<8)|((d2&0xFF)<<16)|(d3<<24));
+					} return;
+					case 7: {
 						/* SSUB8 (A8-660), QSUB8 (A8-558), SHSUB8 (A8-618), USUB8 (A8-804), UQSUB8 (A8-790), UHSUB8 (A8-772) */
-						throw new UnimplementedInstructionException(iword, "*SUB8");
+						int n0 = (byte)n;
+						int n1 = (byte)(n>>8);
+						int n2 = (byte)(n>>16);
+						int n3 = (byte)(n>>24);
+						int m0 = (byte)m;
+						int m1 = (byte)(m>>8);
+						int m2 = (byte)(m>>16);
+						int m3 = (byte)(m>>24);
+						if(unsigned) {
+							n0 &= 0xFF;
+							n1 &= 0xFF;
+							n2 &= 0xFF;
+							n3 &= 0xFF;
+							m0 &= 0xFF;
+							m1 &= 0xFF;
+							m2 &= 0xFF;
+							m3 &= 0xFF;
+						}
+						int d0 = n0-m0;
+						int d1 = n1-m1;
+						int d2 = n2-m2;
+						int d3 = n3-m3;
+						if(half) {
+							d0 >>= 1;
+							d1 >>= 1;
+							d2 >>= 1;
+							d3 >>= 1;
+						}
+						if(saturate) {
+							if(unsigned) {
+								d0 = clamp(d0, 0, 0xFF);
+								d1 = clamp(d1, 0, 0xFF);
+								d2 = clamp(d2, 0, 0xFF);
+								d3 = clamp(d3, 0, 0xFF);
+							}
+							else {
+								d0 = clamp(d0, -0x80, 0x7F);
+								d1 = clamp(d1, -0x80, 0x7F);
+								d2 = clamp(d2, -0x80, 0x7F);
+								d3 = clamp(d3, -0x80, 0x7F);
+							}
+						}
+						writeRegister(Rd, (d0&0xFF)|((d1&0xFF)<<8)|((d2&0xFF)<<16)|(d3<<24));
+					} return;
 					}
 				}
 			}
@@ -1555,7 +1788,9 @@ public final class CPU {
 				else {
 					if(op2 == 0) {
 						/* SETEND (A8-604) */
-						throw new UnimplementedInstructionException(iword, "SETEND");
+						cpsr &= ~(1<<CPSR_BIT_E);
+						cpsr |= iword&(1<<CPSR_BIT_E);
+						return;
 					}
 				}
 				break;
@@ -1587,6 +1822,7 @@ public final class CPU {
 				/* Preload Instruction (A8-530) */
 				/* TODO: When MMU is implemented, preload the page table cache */
 				/* TODO: When JIT is implemented, discard the instruction cace */
+				return;
 			/* 0b100xx11 = unpredictable */
 			case 81:
 			case 85:
@@ -1649,9 +1885,28 @@ public final class CPU {
 				if((op1ish & 5) == 4)
 					/* SRS (ARM, B9-2006) */
 					throw new UnimplementedInstructionException(iword, "SRS");
-				else if((op1ish & 5) == 1)
-					/* RFE (ARM, B9-2000) */
-					throw new UnimplementedInstructionException(iword, "RFE");
+				else if((op1ish & 5) == 1) {
+					/* RFE (ARM, A8-568, B9-2000) */
+					if(!isPrivileged()) throw new UndefinedException();
+					boolean P = ((iword >> 24) & 1) != 0;
+					boolean U = ((iword >> 23) & 1) != 0;
+					boolean W = ((iword >> 21) & 1) != 0;
+					int Rn_real = (iword >> 16) & 15;
+					boolean writeback = W;
+					boolean wordhigher = (P == U);
+					int base_addr = readRegisterAlignPC(Rn_real);
+					int offset_addr;
+					if(wordhigher) offset_addr = base_addr + 4;
+					else offset_addr = base_addr;
+					int address = P ? offset_addr : base_addr;
+					writePC(instructionReadWord(address+4, isPrivileged()));
+					instrWriteCurCPSR(instructionReadWord(address+4, isPrivileged()), 0xF, true);
+					if(writeback) {
+						if(U) writeRegister(Rn_real, base_addr + 8);
+						else writeRegister(Rn_real, base_addr - 8);
+					}
+					return;
+				}
 			}
 			else {
 				/* BLX (A8-348) */
@@ -1824,9 +2079,13 @@ public final class CPU {
 				out.printf("  %6.6s %08X xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n", mode.toString(), sp[mode.spIndex]);
 		}
 	}
-	
 	public Coprocessor getCoprocessor(int id){
 		return coprocessors[id];
+	}
+	private int clamp(int x, int min, int max) {
+		if(x < min) return min;
+		else if(x > max) return max;
+		else return x;
 	}
 }
 /* Note to self: Exception return forms of the data-processing instructions are noted on B4-1613 */

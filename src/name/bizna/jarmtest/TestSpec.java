@@ -243,7 +243,10 @@ public class TestSpec {
 		boolean ret = true;
 		for(Check c : checks) {
 			if(!c.check(cpu)) {
-				failures.add("failed "+c.toString()+"; value was "+c.left.getValue(cpu));
+				if(c.right.toString().startsWith("0x"))
+					failures.add("failed "+c.toString()+"; value was "+String.format("0x%08X",c.left.getValue(cpu)));
+				else
+					failures.add("failed "+c.toString()+"; value was "+c.left.getValue(cpu));
 				ret = false;
 			}
 		}

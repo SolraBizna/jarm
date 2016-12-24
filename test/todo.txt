@@ -10,7 +10,11 @@
 * A8-354 BXJ (Thumb mode not implemented yet, nor is Jazelle mode)
 * A8-388/B9-1982 ERET (exceptions not properly implemented yet)
 * Implement LDREX*/STREX*, unprivileged load/store
-
+* More thorough testing of the saturating operations and their friends
+** they are undertested right now because they are tiny variations on the same code, with a regular encoding
+* Test RFE after exceptions are fleshed out
+* SUB/SBC are not thoroughly tested because they are trivial variants of ADD/ADC
+* Test and implement SEL when you learn what the heck the GE flags are
 
 The simple and compound loads/stores, and MOV, are not tested. This is because they have received by far the most manual testing. It is also believed that if they were wrong, much more code would be failing. (Also, I'm lazy.)
 
