@@ -40,7 +40,7 @@ public class HardwareDefinition {
 	private boolean sramRO = false;
 	@XmlElementWrapper(name = "devices")
 	@XmlElementRef
-	private List<Device> devices = new ArrayList<>();
+	private List<Device> devices = new ArrayList<Device>();
 
 	public int getMemory() {
 		return memory;
@@ -99,9 +99,9 @@ public class HardwareDefinition {
 		arch.setSRAMRegion(sram);
 		mem.mapRegion(0x80000000, sram);
 
-		List<SimScreen> screens = new ArrayList<>();
-		List<SimGPU> gpus = new ArrayList<>();
-		List<SimKeyboard> keyboards = new ArrayList<>();
+		List<SimScreen> screens = new ArrayList<SimScreen>();
+		List<SimGPU> gpus = new ArrayList<SimGPU>();
+		List<SimKeyboard> keyboards = new ArrayList<SimKeyboard>();
 
 		for (Device dev : getDevices()) {
 			SimComponent component = dev.createComponent(machine);
@@ -116,7 +116,7 @@ public class HardwareDefinition {
 			}
 		}
 
-		List<JComponent> components = new ArrayList<>();
+		List<JComponent> components = new ArrayList<JComponent>();
 		for (int i = 0; i < Math.max(screens.size(), keyboards.size()); i++) {
 			SimScreen screen = i >= screens.size() ? null : screens.get(0);
 			SimGPU gpu = i >= gpus.size() ? null : gpus.get(0);

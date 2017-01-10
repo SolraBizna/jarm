@@ -35,17 +35,6 @@ public class OCARMSim {
 		System.err.println("    The parser that processes the command string is very simple. If you want complex argument escaping, consider making a shell script and executing that.");
 	}
 
-	private static class FSSpec {
-
-		File basepath;
-		boolean writable;
-
-		FSSpec(File basepath, boolean writable) {
-			this.basepath = basepath;
-			this.writable = writable;
-		}
-	}
-
 	public static void main(String[] args) throws IOException {
 		final StringBuilder xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<hardwareDefinition>\n");
 		final StringBuilder devicesSection = new StringBuilder();
@@ -62,122 +51,119 @@ public class OCARMSim {
 		int i = 0;
 		while (i < args.length) {
 			String arg = args[i++];
-			switch (arg) {
-				case "-rom":
-					if (i >= args.length) {
-						System.err.println("No parameter given to -rom");
-						commandLineValid = false;
-					} else {
-						xml.append("\t<rom>").append(args[i++]).append("</rom>\n");
-						romGiven = true;
-					}
-					break;
-				case "-sramro":
-				case "-sramrw":
-					if (i >= args.length) {
-						System.err.println("No parameter given to -sram*");
-						commandLineValid = false;
-					} else {
-						xml.append("\t<sram>").append(args[i++]).append("</sram>\n");
-						xml.append("\t<sramRO>").append(arg.endsWith("ro")).append("</sramRO>");
-					}
-					break;
-				case "-memory":
-					if (i >= args.length) {
-						System.err.println("No parameter given to -memory");
-						commandLineValid = false;
-					} else {
-						int q = Integer.parseInt(args[i++]);
-						if (q < 0 || q > 2097152) {
-							System.err.println("Out-of-range parameter for -memory");
-							commandLineValid = false;
-						} else {
-							xml.append("\t<memory>").append(q).append("</memory>\n");
-						}
-					}
-					break;
-				case "-screen":
-					if (i >= args.length) {
-						System.err.println("No parameter given to -screen");
-						commandLineValid = false;
-					} else {
-						int q = Integer.parseInt(args[i++]);
-						if (q < 0 || q > 3) {
-							System.err.println("Out-of-range parameter for -screen");
-							commandLineValid = false;
-						} else {
-							switch (q) {
-								case 1:
-									devicesSection.append("\t\t<screen width=\"50\" height=\"16\" bits=\"1\" />\n");
-									break;
-								case 2:
-									devicesSection.append("\t\t<screen width=\"80\" height=\"25\" bits=\"4\" />\n");
-									break;
-								case 3:
-									devicesSection.append("\t\t<screen width=\"160\" height=\"50\" bits=\"8\" />\n");
-									break;
-							}
-							devicesSection.append("\t\t<gpu />\n");
-							devicesSection.append("\t\t<keyboard />\n");
-						}
-					}
-					break;
-				case "-sram-size":
-					if (i >= args.length) {
-						System.err.println("No parameter given to -sram-size");
-						commandLineValid = false;
-					} else {
-						int q = Integer.parseInt(args[i++]);
-						if (q < 0 || q > 1073741824) {
-							System.err.println("Out-of-range parameter for -sram-size");
-							commandLineValid = false;
-						} else {
-							xml.append("\t<sramSize>").append(q).append("</sramSize>\n");
-						}
-					}
-					break;
-				/* TODO: -fs* -drive* */
-				case "-fsro":
-				case "-fsrw":
-					if (i >= args.length) {
-						System.err.println("No parameter given to -fs*");
-						commandLineValid = false;
-					} else {
-						File basepath = new File(args[i++]);
-						if (!basepath.exists() || !basepath.isDirectory()) {
-							System.err.println("Argument to " + arg + " must be a directory, and must already exist.");
-							commandLineValid = false;
-						} else {
-							devicesSection.append("\t\t<fs basepath=\"").append(basepath).append("\" writable=\"").append(arg.equals("-fsrw")).append("\" />\n");
-						}
-					}
-					break;
-				case "-trace":
-					OCARM.instance.setTraceInvocations(true);
-					break;
-				case "-addrinfocmd":
-					if (i >= args.length) {
-						System.err.println("No parameter given to -addrinfocmd");
-						commandLineValid = false;
-					} else {
-						addrinfocmd = args[i++];
-					}
-					break;
-				case "-gdb":
-					if (i >= args.length) {
-						System.err.println("No parameter given to -gdb");
-						commandLineValid = false;
-					} else {
-						gdbPort = Integer.parseInt(args[i++]);
-					}
-					break;
-				case "-gdbverbose":
-					gdbVerbose = true;
-					break;
-				default:
-					System.err.println("Unknown command line argument: " + arg);
+			// ick! thanks, Java 1.6!
+			if(arg.equals("-rom")) {
+				if (i >= args.length) {
+					System.err.println("No parameter given to -rom");
 					commandLineValid = false;
-					break;
+				} else {
+					xml.append("\t<rom>").append(args[i++]).append("</rom>\n");
+					romGiven = true;
+				}
+			}
+			else if(arg.equals("-sramro") || arg.equals("-sramrw")) {
+				if (i >= args.length) {
+					System.err.println("No parameter given to -sram*");
+					commandLineValid = false;
+				} else {
+					xml.append("\t<sram>").append(args[i++]).append("</sram>\n");
+					xml.append("\t<sramRO>").append(arg.endsWith("ro")).append("</sramRO>");
+				}
+			}
+			else if(arg.equals("-memory")) {
+				if (i >= args.length) {
+					System.err.println("No parameter given to -memory");
+					commandLineValid = false;
+				} else {
+					int q = Integer.parseInt(args[i++]);
+					if (q < 0 || q > 2097152) {
+						System.err.println("Out-of-range parameter for -memory");
+						commandLineValid = false;
+					} else {
+						xml.append("\t<memory>").append(q).append("</memory>\n");
+					}
+				}
+			}
+			else if(arg.equals("-screen")) {
+				if (i >= args.length) {
+					System.err.println("No parameter given to -screen");
+					commandLineValid = false;
+				} else {
+					int q = Integer.parseInt(args[i++]);
+					if (q < 0 || q > 3) {
+						System.err.println("Out-of-range parameter for -screen");
+						commandLineValid = false;
+					} else {
+						switch (q) {
+						case 1:
+							devicesSection.append("\t\t<screen width=\"50\" height=\"16\" bits=\"1\" />\n");
+							break;
+						case 2:
+							devicesSection.append("\t\t<screen width=\"80\" height=\"25\" bits=\"4\" />\n");
+							break;
+						case 3:
+							devicesSection.append("\t\t<screen width=\"160\" height=\"50\" bits=\"8\" />\n");
+							break;
+						}
+						devicesSection.append("\t\t<gpu />\n");
+						devicesSection.append("\t\t<keyboard />\n");
+					}
+				}
+			}
+			else if(arg.equals("-sram-size")) {
+				if (i >= args.length) {
+					System.err.println("No parameter given to -sram-size");
+					commandLineValid = false;
+				} else {
+					int q = Integer.parseInt(args[i++]);
+					if (q < 0 || q > 1073741824) {
+						System.err.println("Out-of-range parameter for -sram-size");
+						commandLineValid = false;
+					} else {
+						xml.append("\t<sramSize>").append(q).append("</sramSize>\n");
+					}
+				}
+			}
+			else if(arg.equals("-fsro") || arg.equals("-fsrw")) {
+				/* TODO: -drive* */
+				if (i >= args.length) {
+					System.err.println("No parameter given to -fs*");
+					commandLineValid = false;
+				} else {
+					File basepath = new File(args[i++]);
+					if (!basepath.exists() || !basepath.isDirectory()) {
+						System.err.println("Argument to " + arg + " must be a directory, and must already exist.");
+						commandLineValid = false;
+					} else {
+						devicesSection.append("\t\t<fs basepath=\"").append(basepath).append("\" writable=\"").append(arg.equals("-fsrw")).append("\" />\n");
+					}
+				}
+			}
+			else if(arg.equals("-trace")) {
+				OCARM.instance.setTraceInvocations(true);
+			}
+			else if(arg.equals("-addrinfocmd")) {
+				if (i >= args.length) {
+					System.err.println("No parameter given to -addrinfocmd");
+					commandLineValid = false;
+				} else {
+					addrinfocmd = args[i++];
+				}
+			}
+			else if(arg.equals("-gdb")) {
+				if (i >= args.length) {
+					System.err.println("No parameter given to -gdb");
+					commandLineValid = false;
+				} else {
+					gdbPort = Integer.parseInt(args[i++]);
+				}
+			}
+			else if(arg.equals("-gdbverbose")) {
+				gdbVerbose = true;
+			}
+			else {
+				System.err.println("Unknown command line argument: " + arg);
+				commandLineValid = false;
 			}
 		}
 		if (!romGiven) {

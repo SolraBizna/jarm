@@ -1,0 +1,4 @@
+r1 := 0x1234ABCD
+
+r0 == 0xFFFFCDAB
+

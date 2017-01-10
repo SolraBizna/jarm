@@ -1,0 +1,25 @@
+-*- mode: outline; word-wrap: t -*-
+
+* Interrupts, hopefully including reset, don't forget SVC
+* Conditional execution (288)
+* Memory access (294): offset, pre-index, post-index
+* conditions (N, Z, C, V)
+* A8-348 BLX (Thumb mode not implemented yet)
+* A8-350 BLX (Register; Thumb mode not implemented yet)
+* A8-352 BX (Register; Thumb mode not implemented yet)
+* A8-354 BXJ (Thumb mode not implemented yet, nor is Jazelle mode)
+* A8-388/B9-1982 ERET (exceptions not properly implemented yet)
+* Implement LDREX*/STREX*, unprivileged load/store
+* More thorough testing of the saturating operations and their friends
+** they are undertested right now because they are tiny variations on the same code, with a regular encoding
+* Test RFE after exceptions are fleshed out
+* SUB/SBC are not thoroughly tested because they are trivial variants of ADD/ADC
+* Test and implement SEL when you learn what the heck the GE flags are
+
+The simple and compound loads/stores, and MOV, are not tested. This is because they have received by far the most manual testing. It is also believed that if they were wrong, much more code would be failing. (Also, I'm lazy.)
+
+MVN is not tested as it is trivial.
+
+The coprocessor instructions are not tested, because they are coprocessor-specific. The "sane" forms have been thoroughly tested manually.
+
+Straightforward MRS and MSR are not tested because their operation is trivial, and critical to startup code success. If they were not working, programs would not boot.

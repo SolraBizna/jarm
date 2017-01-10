@@ -33,11 +33,11 @@ public class SimpleDebugger extends BasicDebugger {
 
 	private final String addrinfocmd;
 	private final DebugPanel panel;
-	private final ConcurrentLinkedQueue<Command> commands = new ConcurrentLinkedQueue<>();
+	private final ConcurrentLinkedQueue<Command> commands = new ConcurrentLinkedQueue<Command>();
 	private CoredumpUtils coredumpUtils;
-	private final AtomicReference<String> breakpointsString = new AtomicReference<>("");
-	private final AtomicReference<String> readWatchpointsString = new AtomicReference<>("");
-	private final AtomicReference<String> writeWatchpointsString = new AtomicReference<>("");
+	private final AtomicReference<String> breakpointsString = new AtomicReference<String>("");
+	private final AtomicReference<String> readWatchpointsString = new AtomicReference<String>("");
+	private final AtomicReference<String> writeWatchpointsString = new AtomicReference<String>("");
 	private final AtomicLong minStack = new AtomicLong();
 
 	public SimpleDebugger(String addrinfocmd) {
@@ -205,6 +205,7 @@ public class SimpleDebugger extends BasicDebugger {
 	}
 
 	private class DebugPanel extends JPanel {
+		public static final long serialVersionUID = 1;
 
 		private final CPUStatePanel cpuStatePanel;
 
@@ -219,6 +220,7 @@ public class SimpleDebugger extends BasicDebugger {
 			JPanel buttonPanel = new JPanel();
 			add(buttonPanel);
 			JButton resetButton = new JButton(new AbstractAction("Reset") {
+				public static final long serialVersionUID = 1;
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					pushCommand(Command.RESET);
@@ -226,6 +228,7 @@ public class SimpleDebugger extends BasicDebugger {
 			});
 			buttonPanel.add(resetButton);
 			JButton stepButton = new JButton(new AbstractAction("Step") {
+				public static final long serialVersionUID = 1;
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					pushCommand(Command.STEP);
@@ -233,6 +236,7 @@ public class SimpleDebugger extends BasicDebugger {
 			});
 			buttonPanel.add(stepButton);
 			JButton runButton = new JButton(new AbstractAction("Run") {
+				public static final long serialVersionUID = 1;
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					pushCommand(Command.RUN);
@@ -240,6 +244,7 @@ public class SimpleDebugger extends BasicDebugger {
 			});
 			buttonPanel.add(runButton);
 			JButton pauseButton = new JButton(new AbstractAction("Pause") {
+				public static final long serialVersionUID = 1;
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					pushCommand(Command.PAUSE);
@@ -247,6 +252,7 @@ public class SimpleDebugger extends BasicDebugger {
 			});
 			buttonPanel.add(pauseButton);
 			JButton coreButton = new JButton(new AbstractAction("Dump Core") {
+				public static final long serialVersionUID = 1;
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					pushCommand(Command.DUMP);
@@ -261,6 +267,7 @@ public class SimpleDebugger extends BasicDebugger {
 			final JTextField breakpointsField = new JTextField(40);
 			breakpointsPanel.add(breakpointsField);
 			JButton breakpointsButton = new JButton(new AbstractAction("Apply") {
+				public static final long serialVersionUID = 1;
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					breakpointsString.set(breakpointsField.getText());
@@ -276,6 +283,7 @@ public class SimpleDebugger extends BasicDebugger {
 			final JTextField readWatchpointsField = new JTextField(35);
 			readWatchpointsPanel.add(readWatchpointsField);
 			JButton readWatchpointsButton = new JButton(new AbstractAction("Apply") {
+				public static final long serialVersionUID = 1;
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					readWatchpointsString.set(readWatchpointsField.getText());
@@ -291,6 +299,7 @@ public class SimpleDebugger extends BasicDebugger {
 			final JTextField writeWatchpointsField = new JTextField(35);
 			writeWatchpointsPanel.add(writeWatchpointsField);
 			JButton writeWatchpointsButton = new JButton(new AbstractAction("Apply") {
+				public static final long serialVersionUID = 1;
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					writeWatchpointsString.set(writeWatchpointsField.getText());
@@ -306,6 +315,7 @@ public class SimpleDebugger extends BasicDebugger {
 			final JTextField minStackField = new JTextField(8);
 			minStackPanel.add(minStackField);
 			JButton minStackButton = new JButton(new AbstractAction("Apply") {
+				public static final long serialVersionUID = 1;
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					minStack.set(Long.parseUnsignedLong(minStackField.getText(), 16));

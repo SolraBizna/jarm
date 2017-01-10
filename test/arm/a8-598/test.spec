@@ -1,0 +1,2 @@
+r1 := 0x89ABCDEF
+r0 == 0xFFFFFFAB

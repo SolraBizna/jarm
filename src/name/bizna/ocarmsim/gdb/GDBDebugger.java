@@ -154,36 +154,28 @@ public class GDBDebugger extends BasicDebugger {
 
 	private void answerQuery(GDBCommandPacket packet) throws IOException {
 		String command = packet.getData().contains(":") ? packet.getData().substring(0, packet.getData().indexOf(':')) : packet.getData();
-		switch (command) {
-			case "Supported":
-				socket.write(new GDBPacket("multiprocess-;swbreak-;hwbreak+"));
-				break;
-			case "Attached":
-				socket.write(new GDBPacket("1"));
-				break;
-			case "Symbol":
-				// TODO: Symbols?
-				socket.write(new GDBPacket("OK"));
-				break;
-			case "Offsets":
-				// TODO: Relocate?
-				socket.write(new GDBPacket(""));
-				break;
-			case "TStatus":
-				// TODO: Tracing not supported.
-				socket.write(new GDBPacket(""));
-				break;
-			case "fThreadInfo":
-				// No threads.
-				socket.write(new GDBPacket("l"));
-				break;
-			case "C":
-				// No threads.
-				socket.write(new GDBPacket("E00"));
-				break;
-			default:
-				throw new RuntimeException("Unsupported query command: " + command);
-		}
+		// even more thans, Java 1.6
+		if(command.equals("Supported"))
+			socket.write(new GDBPacket("multiprocess-;swbreak-;hwbreak+"));
+		else if(command.equals("Attached"))
+			socket.write(new GDBPacket("1"));
+		else if(command.equals("Symbol"))
+			// TODO: Symbols?
+			socket.write(new GDBPacket("OK"));
+		else if(command.equals("Offsets"))
+			// TODO: Relocate?
+			socket.write(new GDBPacket(""));
+		else if(command.equals("TStatus"))
+			// TODO: Tracing not supported.
+			socket.write(new GDBPacket(""));
+		else if(command.equals("fThreadInfo"))
+			// No threads.
+			socket.write(new GDBPacket("l"));
+		else if(command.equals("C"))
+			// No threads.
+			socket.write(new GDBPacket("E00"));
+		else
+			throw new RuntimeException("Unsupported query command: " + command);
 	}
 
 	private char[] readRegister(int register) throws IOException {
@@ -366,22 +358,19 @@ public class GDBDebugger extends BasicDebugger {
 
 	private void doV(GDBCommandPacket packet) throws IOException {
 		String command = packet.getData().contains(";") ? packet.getData().substring(0, packet.getData().indexOf(';')) : packet.getData();
-		switch (command) {
-			case "Cont?":
-				// vCont not supported.
-				socket.write(new GDBPacket(""));
-				break;
-			case "Kill":
-				reset();
-				socket.write(new GDBPacket("OK"));
-				break;
-			default:
-				throw new RuntimeException("Unsupported v command: " + command);
+		if(command.equals("Cont?"))
+			// vCont not supported.
+			socket.write(new GDBPacket(""));
+		else if(command.equals("Kill")) {
+			reset();
+			socket.write(new GDBPacket("OK"));
 		}
+		else
+			throw new RuntimeException("Unsupported v command: " + command);
 	}
 
 	private void step(GDBCommandPacket packet) throws IOException {
-		int signal = Integer.parseUnsignedInt(packet.getData().split(";")[0], 16);
+		// int signal = Integer.parseUnsignedInt(packet.getData().split(";")[0], 16);
 		int addr = packet.getData().split(";").length > 1 && !packet.getData().split(";")[1].isEmpty() ? Integer.parseUnsignedInt(packet.getData().split(";")[1], 16) : cpu.readCurrentPC();
 
 		cpu.writePC(addr);
@@ -393,7 +382,7 @@ public class GDBDebugger extends BasicDebugger {
 	}
 
 	private void cont(GDBCommandPacket packet) throws IOException {
-		int signal = Integer.parseUnsignedInt(packet.getData().split(";")[0], 16);
+		// int signal = Integer.parseUnsignedInt(packet.getData().split(";")[0], 16);
 		int addr = packet.getData().split(";").length > 1 && !packet.getData().split(";")[1].isEmpty() ? Integer.parseUnsignedInt(packet.getData().split(";")[1], 16) : cpu.readCurrentPC();
 
 		cpu.writePC(addr);
@@ -456,9 +445,11 @@ public class GDBDebugger extends BasicDebugger {
 	}
 
 	private class DebugPanel extends JPanel {
+		public static final long serialVersionUID = 1;
 
 		public DebugPanel() {
 			JButton resetButton = new JButton(new AbstractAction("Reset") {
+				public static final long serialVersionUID = 1;
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					reset();
@@ -466,6 +457,7 @@ public class GDBDebugger extends BasicDebugger {
 			});
 			add(resetButton);
 			JButton pauseButton = new JButton(new AbstractAction("Pause") {
+				public static final long serialVersionUID = 1;
 				@Override
 				public void actionPerformed(ActionEvent e) {
 					pause();

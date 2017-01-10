@@ -69,6 +69,7 @@ public final class CPU {
 	private static final int CPSR_MASK_M = 0x1F;
 	private static final int APSR_READ_MASK = 0xF80F0100;
 	private static final int APSR_WRITE_MASK = 0xF80F0000;
+	private static final int CPSR_USER_READ_MASK = 0xF8FFF3DF;
 	private static final int CPSR_READ_MASK = 0xFFFFFFFF;
 	/* the ARM ARM ARM says we should be able to write the E bit this way but also deprecates it
 	 * we'll let them write it because it costs us nothing
@@ -161,9 +162,9 @@ public final class CPU {
 		cur_lr = newMode.lrIndex;
 		mode = newMode;
 	}
-	private void setProcessorMode(int newModeRep) {
+	private void setProcessorMode(int newModeRep) throws UndefinedException {
 		ProcessorMode newMode = ProcessorMode.getModeFromRepresentation(newModeRep);
-		if(newMode == null) throw new NullPointerException();
+		if(newMode == null) throw new UndefinedException();
 		setProcessorMode(newMode);
 	}
 	private void enterProcessorModeByException(ProcessorMode newMode) {
@@ -197,9 +198,13 @@ public final class CPU {
 	public boolean isLittleEndian() { return (cpsr & (1<<CPSR_BIT_E)) == 0; }
 	public boolean isBigEndian() { return (cpsr & (1<<CPSR_BIT_E)) != 0; }
 	public boolean isPrivileged() { return mode.privileged; }
+	public boolean usingStrictAlignment() { return (cpsr & (1<<CPSR_BIT_A)) != 0; }
+	public boolean areIRQsEnabled() { return (cpsr & (1<<CPSR_BIT_I)) != 0; }
+	public boolean areFIQsEnabled() { return (cpsr & (1<<CPSR_BIT_F)) != 0; }
+	public int getMode() { return cpsr & 31; }
 	public void writeCPSR(int value) { cpsr = value; }
 	public int readCPSR() { return cpsr; }
-	private void instrWriteCurCPSR(int value, int mask, boolean isExceptionReturn) {
+	private void instrWriteCurCPSR(int value, int mask, boolean isExceptionReturn) throws UndefinedException {
 		/* (B1-1153) */
 		int writeMask = 0;
 		if((mask & 8) != 0) {
@@ -317,6 +322,7 @@ public final class CPU {
 	CP15 cp15;
 	public boolean inStrictAlignMode() { return (cp15.SCTLR & (1<<CP15.SCTLR_BIT_A)) != 0; }
 	/*** INITIALIZATION ***/
+	public CPU() { this(null); }
 	public CPU(Debugger debugger) {
 		this.debugger = debugger;
 		vm = new VirtualMemorySpace(mem, debugger);
@@ -654,7 +660,7 @@ public final class CPU {
 		else {
 			if((op2 & 8) == 0) {
 				/* Miscellaneous instructions (A5-207) */
-				int op = (op1 >> 1) & 3;
+				int op = (iword >> 21) & 3;
 				op1 = (iword >> 16) & 15;
 				/* op2 is still good */
 				switch(op2) {
@@ -662,27 +668,47 @@ public final class CPU {
 					if((iword & 512) != 0) {
 						if((op & 1) == 0) {
 							/* MRS (banked register, B9-1992) */
-							throw new UnimplementedInstructionException(iword, "MRS");
+							/* We don't have Virtualization extensions */
+							throw new UndefinedException();
 						}
 						else {
 							/* MSR (banked register, B9-1994) */
-							throw new UnimplementedInstructionException(iword, "MSR");
+							/* We don't have Virtualization extensions */
+							throw new UndefinedException();
 						}
 					}
 					else {
 						switch(op) {
-						case 0: case 2:
+						case 0: case 2: {
 							/* MRS (A8-496, B9-1990) */
-							throw new UnimplementedInstructionException(iword, "MRS");
-						case 1:
-							if((op1 & 3) == 0) {
-								/* MSR (register, A8-500) */
-								throw new UnimplementedInstructionException(iword, "MSR");
+							boolean readSPSR = (op & 2) != 0;
+							int Rd = (iword >> 12) & 15;
+							if(readSPSR) {
+								if(mode == ProcessorMode.USER || mode == ProcessorMode.SYSTEM)
+									throw new UndefinedException();
+								writeRegister(Rd, spsr[mode.spsrIndex]);
+								return;
 							}
-							/* fall through */
+							else {
+								int red = cpsr;
+								if(mode == ProcessorMode.USER) red &= CPSR_USER_READ_MASK;
+								writeRegister(Rd, red);
+								return;
+							}
+						}
+						case 1:
 						case 3:
-							/* MSR (register, B9-1998) */
-							throw new UnimplementedInstructionException(iword, "MSR");
+							/* MSR (register, A8-500, B9-1998) */
+							int mask = (iword >> 16) & 15;
+							boolean writingSPSR = (op & 2) != 0;
+							if(writingSPSR || ((mask & 3) == 1) || ((mask & 2) != 0))
+								if(!isPrivileged()) throw new UndefinedException();
+							int imm32 = expandARMImmediate(iword & 4095);
+							if(writingSPSR)
+								instrWriteCurSPSR(imm32, mask);
+							else
+								instrWriteCurCPSR(imm32, mask, false);
+							return;
 						}
 					}
 					break;
@@ -722,7 +748,28 @@ public final class CPU {
 					break;
 				case 5:
 					/* Saturating addition and subtraction (A5-202) */
-					throw new UnimplementedInstructionException(iword, "saturating addition / subtraction");
+					/* QADD/QSUB/QDADD/QDSUB (A8-540 and change) */
+					boolean subtract = (op & 1) != 0;
+					boolean doubleTrouble = (op & 2) != 0;
+					int Rm = iword&15;
+					int Rn = (iword>>16)&15;
+					int Rd = (iword>>12)&15;
+					long n = readRegister(Rn);
+					if(doubleTrouble) n *= 2L; // why only n? WHO KNOWS
+					long m = readRegister(Rm);
+					long result;
+					if(subtract) result = n - m;
+					else result = n + m;
+					if(result > 0x7FFFFFFFL) {
+						writeRegister(Rd, 0x7FFFFFFF);
+						cpsr |= 1<<CPSR_BIT_Q;
+					}
+					else if(result < -0x80000000L) {
+						writeRegister(Rd, 0x80000000);
+						cpsr |= 1<<CPSR_BIT_Q;
+					}
+					else writeRegister(Rd, (int)result);
+					return;
 				case 6:
 					switch(op) {
 					case 3:
@@ -734,7 +781,8 @@ public final class CPU {
 					switch(op) {
 					case 1:
 						/* BKPT (A8-346) */
-						throw new UnimplementedInstructionException(iword, "BKPT");
+						/* TODO: Invasive debugging mode */
+						return;
 					case 2:
 						/* HVC (B9-1984) but we do NOT have Virtualization Extensions */
 					case 3:
@@ -761,9 +809,18 @@ public final class CPU {
 				case 20:
 					/* SMLALBB/SMLALBT/SMLALTB/SMLALTT (A8-626) */
 					throw new UnimplementedInstructionException(iword, "SMLALBB/SMLALBT/SMLALTB/SMLALTT");
-				case 22:
+				case 22: {
 					/* SMULBB/SMULBT/SMULTB/SMULTT (A8-644) */
-					throw new UnimplementedInstructionException(iword, "SMULBB/SMULBT/SMULTB/SMULTT");
+					int Rn = iword & 15;
+					int Rm = (iword>>8) & 15;
+					int Rd = (iword>>16) & 15;
+					int va, vb;
+					if((op2 & 2) != 0) va = readRegister(Rn)>>16;
+					else va = (short)readRegister(Rn);
+					if((op2 & 4) != 0) vb = readRegister(Rm)>>16;
+					else vb = (short)readRegister(Rm);
+					writeRegister(Rd, va*vb);
+				}
 				}
 				throw new UndefinedException();
 			}
@@ -1266,7 +1323,17 @@ public final class CPU {
 					if(op1 == 0) {
 						if((op2 & 1) == 0) {
 							/* PKH (A8-522) */
-							throw new UnimplementedInstructionException(iword, "PKH");
+							int Rn_real = (iword >> 16) & 15;
+							int Rd = (iword >> 12) & 15;
+							int Rm = iword & 15;
+							boolean isTB = (iword&64)!=0;
+							int m = applyIRShift(readRegister(Rm), isTB ? 2 : 0, (iword>>7)&31);
+							int n = readRegister(Rn_real);
+							if(isTB)
+								writeRegister(Rd, (m&0x0000FFFF)|(n&0xFFFF0000));
+							else
+								writeRegister(Rd, (m&0xFFFF0000)|(n&0x0000FFFF));
+							return;
 						}
 						else if(op2 == 3) {
 							if(Radd != 15) {
@@ -1309,11 +1376,17 @@ public final class CPU {
 							/* the unsigned/signed symmetry breaks down here */
 							if(!unsigned) {
 								/* REV (A8-562) */
-								throw new UnimplementedInstructionException(iword, "REV");
+								int Rm = iword&15;
+								int Rd = (iword>>12)&15;
+								writeRegister(Rd, Integer.reverseBytes(readRegister(Rm)));
+								return;
 							}
 							else {
 								/* RBIT (A8-560) */
-								throw new UnimplementedInstructionException(iword, "RBIT");
+								int Rm = iword&15;
+								int Rd = (iword>>12)&15;
+								writeRegister(Rd, Integer.reverse(readRegister(Rm)));
+								return;
 							}
 						case 0x33: {
 							/* SXTAH (A8-728), UXTAH (A8-810) */
@@ -1330,11 +1403,18 @@ public final class CPU {
 							/* breaks down here too */
 							if(!unsigned) {
 								/* REV16 (A8-564) */
-								throw new UnimplementedInstructionException(iword, "REV16");
+								int Rm = iword&15;
+								int Rd = (iword>>12)&15;
+								writeRegister(Rd, (Short.reverseBytes((short)readRegister(Rm))&0xFFFF)
+										|(Short.reverseBytes((short)(readRegister(Rm)>>16))<<16));
+								return;
 							}
 							else {
 								/* REVSH (A8-566) */
-								throw new UnimplementedInstructionException(iword, "REVSH");
+								int Rm = iword&15;
+								int Rd = (iword>>12)&15;
+								writeRegister(Rd, Short.reverseBytes((short)readRegister(Rm)));
+								return;
 							}
 						default:
 							if((op1 & 6) == 2 && (op2 & 1) == 0) {
@@ -1350,25 +1430,224 @@ public final class CPU {
 					boolean unsigned = (op1 & 4) != 0;
 					boolean saturate = (op1 & 3) == 2;
 					boolean half = (op1 & 3) == 3;
+					int Rn_real = (iword>>16)&15;
+					int Rd = (iword>>12)&15;
+					int Rm = iword&15;
+					int n = readRegister(Rn_real);
+					int m = readRegister(Rm);
 					switch(op2) {
-					case 0:
+					case 0: {
 						/* SADD16 (A8-586), QADD16 (A8-542), SHADD16 (A5-608), UADD16 (A8-750), UQADD16 (A8-780), UHADD16 (A8-762) */
-						throw new UnimplementedInstructionException(iword, "*ADD16");
-					case 1:
+						int loN = (short)n;
+						int hiN = (short)(n>>16);
+						int loM = (short)m;
+						int hiM = (short)(m>>16);
+						if(unsigned) {
+							loN &= 0xFFFF;
+							hiN &= 0xFFFF;
+							loM &= 0xFFFF;
+							hiM &= 0xFFFF;
+						}
+						int loD = loN + loM;
+						int hiD = hiN + hiM;
+						if(half) {
+							loD >>= 1;
+							hiD >>= 1;
+						}
+						if(saturate) {
+							if(unsigned) {
+								loD = clamp(loD, 0, 0xFFFF);
+								hiD = clamp(hiD, 0, 0xFFFF);
+							}
+							else {
+								loD = clamp(loD, -0x8000, 0x7FFF);
+								hiD = clamp(hiD, -0x8000, 0x7FFF);
+							}
+						}
+						writeRegister(Rd, (loD&0xFFFF)|(hiD<<16));
+					} return;
+					case 1: {
 						/* SASX (A8-590), QASX (A8-546), SHASX (A8-612), UASX (A8-754), UQASX (A8-784), UHASX (A8-766) */
-						throw new UnimplementedInstructionException(iword, "*ASX");
-					case 2:
+						int loN = (short)n;
+						int hiN = (short)(n>>16);
+						int loM = (short)m;
+						int hiM = (short)(m>>16);
+						if(unsigned) {
+							loN &= 0xFFFF;
+							hiN &= 0xFFFF;
+							loM &= 0xFFFF;
+							hiM &= 0xFFFF;
+						}
+						int loD = loN - hiM;
+						int hiD = hiN + loM;
+						if(half) {
+							loD >>= 1;
+							hiD >>= 1;
+						}
+						if(saturate) {
+							if(unsigned) {
+								loD = clamp(loD, 0, 0xFFFF);
+								hiD = clamp(hiD, 0, 0xFFFF);
+							}
+							else {
+								loD = clamp(loD, -0x8000, 0x7FFF);
+								hiD = clamp(hiD, -0x8000, 0x7FFF);
+							}
+						}
+						writeRegister(Rd, (loD&0xFFFF)|(hiD<<16));
+					} return;
+					case 2: {
 						/* SSAX (A8-656), QSAX (A8-552), SHSAX (A8-614), USAX (A8-800), UQSAX (A8-786), UHSAX (A8-768) */
-						throw new UnimplementedInstructionException(iword, "*SAX");
-					case 3:
+						int loN = (short)n;
+						int hiN = (short)(n>>16);
+						int loM = (short)m;
+						int hiM = (short)(m>>16);
+						if(unsigned) {
+							loN &= 0xFFFF;
+							hiN &= 0xFFFF;
+							loM &= 0xFFFF;
+							hiM &= 0xFFFF;
+						}
+						int loD = loN + hiM;
+						int hiD = hiN - loM;
+						if(half) {
+							loD >>= 1;
+							hiD >>= 1;
+						}
+						if(saturate) {
+							if(unsigned) {
+								loD = clamp(loD, 0, 0xFFFF);
+								hiD = clamp(hiD, 0, 0xFFFF);
+							}
+							else {
+								loD = clamp(loD, -0x8000, 0x7FFF);
+								hiD = clamp(hiD, -0x8000, 0x7FFF);
+							}
+						}
+						writeRegister(Rd, (loD&0xFFFF)|(hiD<<16));
+					} return;
+					case 3: {
 						/* SSUB16 (A8-658), QSUB16 (A8-556), SHSUB16 (A8-616), USUB16 (A8-802), UQSUB16 (A8-788), UHSUB16 (A8-770) */
-						throw new UnimplementedInstructionException(iword, "*SUB16");
-					case 4:
+						int loN = (short)n;
+						int hiN = (short)(n>>16);
+						int loM = (short)m;
+						int hiM = (short)(m>>16);
+						if(unsigned) {
+							loN &= 0xFFFF;
+							hiN &= 0xFFFF;
+							loM &= 0xFFFF;
+							hiM &= 0xFFFF;
+						}
+						int loD = loN - loM;
+						int hiD = hiN - hiM;
+						if(half) {
+							loD >>= 1;
+							hiD >>= 1;
+						}
+						if(saturate) {
+							if(unsigned) {
+								loD = clamp(loD, 0, 0xFFFF);
+								hiD = clamp(hiD, 0, 0xFFFF);
+							}
+							else {
+								loD = clamp(loD, -0x8000, 0x7FFF);
+								hiD = clamp(hiD, -0x8000, 0x7FFF);
+							}
+						}
+						writeRegister(Rd, (loD&0xFFFF)|(hiD<<16));
+					} return;
+					case 4: {
 						/* SADD8 (A8-588), QADD8 (A8-544), SHADD8 (A8-610), UADD8 (A8-752), UQADD8 (A8-782), UHADD8 (A8-764) */
-						throw new UnimplementedInstructionException(iword, "*ADD8");
-					case 7:
+						int n0 = (byte)n;
+						int n1 = (byte)(n>>8);
+						int n2 = (byte)(n>>16);
+						int n3 = (byte)(n>>24);
+						int m0 = (byte)m;
+						int m1 = (byte)(m>>8);
+						int m2 = (byte)(m>>16);
+						int m3 = (byte)(m>>24);
+						if(unsigned) {
+							n0 &= 0xFF;
+							n1 &= 0xFF;
+							n2 &= 0xFF;
+							n3 &= 0xFF;
+							m0 &= 0xFF;
+							m1 &= 0xFF;
+							m2 &= 0xFF;
+							m3 &= 0xFF;
+						}
+						int d0 = n0+m0;
+						int d1 = n1+m1;
+						int d2 = n2+m2;
+						int d3 = n3+m3;
+						if(half) {
+							d0 >>= 1;
+							d1 >>= 1;
+							d2 >>= 1;
+							d3 >>= 1;
+						}
+						if(saturate) {
+							if(unsigned) {
+								d0 = clamp(d0, 0, 0xFF);
+								d1 = clamp(d1, 0, 0xFF);
+								d2 = clamp(d2, 0, 0xFF);
+								d3 = clamp(d3, 0, 0xFF);
+							}
+							else {
+								d0 = clamp(d0, -0x80, 0x7F);
+								d1 = clamp(d1, -0x80, 0x7F);
+								d2 = clamp(d2, -0x80, 0x7F);
+								d3 = clamp(d3, -0x80, 0x7F);
+							}
+						}
+						writeRegister(Rd, (d0&0xFF)|((d1&0xFF)<<8)|((d2&0xFF)<<16)|(d3<<24));
+					} return;
+					case 7: {
 						/* SSUB8 (A8-660), QSUB8 (A8-558), SHSUB8 (A8-618), USUB8 (A8-804), UQSUB8 (A8-790), UHSUB8 (A8-772) */
-						throw new UnimplementedInstructionException(iword, "*SUB8");
+						int n0 = (byte)n;
+						int n1 = (byte)(n>>8);
+						int n2 = (byte)(n>>16);
+						int n3 = (byte)(n>>24);
+						int m0 = (byte)m;
+						int m1 = (byte)(m>>8);
+						int m2 = (byte)(m>>16);
+						int m3 = (byte)(m>>24);
+						if(unsigned) {
+							n0 &= 0xFF;
+							n1 &= 0xFF;
+							n2 &= 0xFF;
+							n3 &= 0xFF;
+							m0 &= 0xFF;
+							m1 &= 0xFF;
+							m2 &= 0xFF;
+							m3 &= 0xFF;
+						}
+						int d0 = n0-m0;
+						int d1 = n1-m1;
+						int d2 = n2-m2;
+						int d3 = n3-m3;
+						if(half) {
+							d0 >>= 1;
+							d1 >>= 1;
+							d2 >>= 1;
+							d3 >>= 1;
+						}
+						if(saturate) {
+							if(unsigned) {
+								d0 = clamp(d0, 0, 0xFF);
+								d1 = clamp(d1, 0, 0xFF);
+								d2 = clamp(d2, 0, 0xFF);
+								d3 = clamp(d3, 0, 0xFF);
+							}
+							else {
+								d0 = clamp(d0, -0x80, 0x7F);
+								d1 = clamp(d1, -0x80, 0x7F);
+								d2 = clamp(d2, -0x80, 0x7F);
+								d3 = clamp(d3, -0x80, 0x7F);
+							}
+						}
+						writeRegister(Rd, (d0&0xFF)|((d1&0xFF)<<8)|((d2&0xFF)<<16)|(d3<<24));
+					} return;
 					}
 				}
 			}
@@ -1483,6 +1762,122 @@ public final class CPU {
 		switch((iword >> 26) & 3) {
 		case 0: case 1:
 			/* TODO: Memory hints, Advanced SIMD instructions, and miscellaneous instructions (A5-217) */
+			int op1 = (iword >> 20) & 127;
+			int op2 = (iword >> 4) & 15;
+			int Rn = (iword >> 16) & 15;
+			switch(op1) {
+			case 16:
+				if((Rn&1) == 0) {
+					if((op2&2) == 0) {
+						/* CPS (B9-1980) */
+						if(!mode.privileged) return; // act as NOP
+						switch(Rn&12) {
+						case 8:
+							cpsr = cpsr | (iword & 0x1C0);
+							break;
+						case 12:
+							cpsr = cpsr & (~0 ^ (iword & 0x1C0));
+							break;
+						}
+						if((Rn&2) == 2) {
+							setProcessorMode(iword & 0x1F);
+						}
+						return;
+					}
+				}
+				else {
+					if(op2 == 0) {
+						/* SETEND (A8-604) */
+						cpsr &= ~(1<<CPSR_BIT_E);
+						cpsr |= iword&(1<<CPSR_BIT_E);
+						return;
+					}
+				}
+				break;
+			case 18:
+				if(op2 == 7) {
+					/* Unpredictable? Why would you SPECIFICALLY encode Unpredictable?!!?! */
+				}
+				break;
+			case 64:
+			case 66:
+			case 68:
+			case 70:
+			case 72:
+			case 74:
+			case 76:
+			case 78:
+				/* Advanced SIMD element or structure load/store instructions (A7-275) */
+				throw new UnimplementedInstructionException(iword, "A7-275");
+			case 97:
+			case 105:
+				/* Unallocated memory hint (treat as NOP) */
+				if((op2&1) == 0) return;
+			case 65:
+			case 73:
+				/* Unallocated memory hint (treat as NOP) */
+				return;
+			case 69:
+			case 77:
+				/* Preload Instruction (A8-530) */
+				/* TODO: When MMU is implemented, preload the page table cache */
+				/* TODO: When JIT is implemented, discard the instruction cace */
+				return;
+			/* 0b100xx11 = unpredictable */
+			case 81:
+			case 85:
+			case 89:
+			case 93:
+				/* PLD, PLDW (A8-524) */
+				/* TODO: When MMU is implemented, preload the page table cache */
+				break;
+			case 87:
+				switch(op2) {
+				case 1:
+					/* CLREX (A8-360) */
+					/* We have no multiprocessing, so this is a no-op */
+					return;
+				case 4:
+					/* DSB (A8-380) */
+					/* We have no multiprocessing, so this is a no-op */
+					return;
+				case 5:
+					/* DMB (A8-378) */
+					/* We have no multiprocessing, so this is a no-op */
+					return;
+				case 6:
+					/* ISB (A8-389) */
+					/* TODO: When MMU / JIT are implemented, this will be important */
+					return;
+				}
+				break;
+			case 101:
+			case 109:
+				if((op2 & 1) == 0) {
+					/* PLI (A8-532) */
+					throw new UnimplementedInstructionException(iword, "PLI");
+				}
+				break;
+			case 113:
+			case 117:
+			case 121:
+			case 125:
+				if((op2 & 1) == 0) {
+					/* PLD (A8-528) */
+					throw new UnimplementedInstructionException(iword, "PLD/PLDW");
+				}
+				break;
+			case 127:
+				if(op2 == 15) {
+					/* Permanently UNDEFINED */
+					throw new UndefinedException();
+				}
+			default:
+				if((op1 & 96) == 32) {
+					/* Advanced SIMD data-processing intructions (A7-261) */
+					throw new UnimplementedInstructionException(iword, "A7-261");
+				}
+			}
 			break;
 		case 2:
 			if(((iword >> 25) & 1) == 0) {
@@ -1490,16 +1885,35 @@ public final class CPU {
 				if((op1ish & 5) == 4)
 					/* SRS (ARM, B9-2006) */
 					throw new UnimplementedInstructionException(iword, "SRS");
-				else if((op1ish & 5) == 1)
-					/* RFE (ARM, B9-2000) */
-					throw new UnimplementedInstructionException(iword, "RFE");
+				else if((op1ish & 5) == 1) {
+					/* RFE (ARM, A8-568, B9-2000) */
+					if(!isPrivileged()) throw new UndefinedException();
+					boolean P = ((iword >> 24) & 1) != 0;
+					boolean U = ((iword >> 23) & 1) != 0;
+					boolean W = ((iword >> 21) & 1) != 0;
+					int Rn_real = (iword >> 16) & 15;
+					boolean writeback = W;
+					boolean wordhigher = (P == U);
+					int base_addr = readRegisterAlignPC(Rn_real);
+					int offset_addr;
+					if(wordhigher) offset_addr = base_addr + 4;
+					else offset_addr = base_addr;
+					int address = P ? offset_addr : base_addr;
+					writePC(instructionReadWord(address+4, isPrivileged()));
+					instrWriteCurCPSR(instructionReadWord(address+4, isPrivileged()), 0xF, true);
+					if(writeback) {
+						if(U) writeRegister(Rn_real, base_addr + 8);
+						else writeRegister(Rn_real, base_addr - 8);
+					}
+					return;
+				}
 			}
 			else {
 				/* BLX (A8-348) */
-				int imm32 = (iword << 8 >> 6) | ((iword >> 23) & 2) | 1;
+				int imm32 = (iword << 8 >> 6) | (iword << 7 >> 7) | 1;
 				writeLR(readPC()-4);
 				// always switches instruction sets; set the low bit to achieve Thumb enlightenment
-				interworkingBranch(((readPC()&~3)+imm32)|1);
+				interworkingBranch((readPC()&~3)+imm32);
 				return;
 			}
 			break;
@@ -1665,9 +2079,13 @@ public final class CPU {
 				out.printf("  %6.6s %08X xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n", mode.toString(), sp[mode.spIndex]);
 		}
 	}
-	
 	public Coprocessor getCoprocessor(int id){
 		return coprocessors[id];
+	}
+	private int clamp(int x, int min, int max) {
+		if(x < min) return min;
+		else if(x > max) return max;
+		else return x;
 	}
 }
 /* Note to self: Exception return forms of the data-processing instructions are noted on B4-1613 */

@@ -1,0 +1,2 @@
+r1 := 0xffffffff
+r0 == 0xfff00fff
