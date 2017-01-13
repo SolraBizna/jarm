@@ -653,4 +653,10 @@ public class JARMArchitecture implements Architecture {
     	valueToHandle.clear();
     	handleToValue.clear();
     }
+
+	@Override
+	public void onSignal() {
+		// TODO Auto-generated method stub
+		
+	}
 }

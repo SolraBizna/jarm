@@ -8,13 +8,13 @@ import org.apache.logging.log4j.Logger;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.config.Property;
 import li.cil.oc.api.Machine;
-import cpw.mods.fml.common.Mod;
-import cpw.mods.fml.common.Mod.EventHandler;
-import cpw.mods.fml.common.Mod.Instance;
-import cpw.mods.fml.common.event.FMLInitializationEvent;
-import cpw.mods.fml.common.event.FMLPreInitializationEvent;
-import cpw.mods.fml.common.network.NetworkCheckHandler;
-import cpw.mods.fml.relauncher.Side;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.Mod.EventHandler;
+import net.minecraftforge.fml.common.Mod.Instance;
+import net.minecraftforge.fml.common.event.FMLInitializationEvent;
+import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
+import net.minecraftforge.fml.common.network.NetworkCheckHandler;
+import net.minecraftforge.fml.relauncher.Side;
 
 @Mod(name = OCARM.NAME, modid = OCARM.MODID, version = OCARM.VERSION)
 public class OCARM {
@@ -164,7 +164,7 @@ public class OCARM {
     		ramSizes = defaultRamSizes;
     		prop.set(defaultRamSizes);
     	}
-    	prop.comment = "RAM module sizes in kibibytes, like the similar option in\nOpenComputers.cfg. Default values are 192, 256, 384, 512, 768, 1024,\nsame as for the Lua architecture.";
+    	prop.setComment("RAM module sizes in kibibytes, like the similar option in\nOpenComputers.cfg. Default values are 192, 256, 384, 512, 768, 1024,\nsame as for the Lua architecture.");
     	/* CPU speeds */
     	prop = cfg.get(Configuration.CATEGORY_GENERAL, "cpuCyclesPerTick", defaultCpuCyclesPerTick);
     	cpuCyclesPerTick = prop.getIntList();
@@ -172,7 +172,7 @@ public class OCARM {
     		cpuCyclesPerTick = defaultCpuCyclesPerTick;
     		prop.set(defaultCpuCyclesPerTick);
     	}
-    	prop.comment = "CPU cycles per Minecraft tick.\nDefault values are 1000, 5000, 25000 (20KHz/100KHz/500KHz)";
+    	prop.setComment("CPU cycles per Minecraft tick.\nDefault values are 1000, 5000, 25000 (20KHz/100KHz/500KHz)");
     	/* RAM latencies */
     	prop = cfg.get(Configuration.CATEGORY_GENERAL, "ramTier1Latency", defaultRamTier1Latency);
     	ramTier1Latency = prop.getIntList();
@@ -180,21 +180,21 @@ public class OCARM {
     		ramTier1Latency = defaultRamTier1Latency;
     		prop.set(defaultRamTier1Latency);
     	}
-    	prop.comment = "Iron-tier RAM access latencies for each CPU tier, in cycles.\nDefault values are 1, 5, and 25.";
+    	prop.setComment("Iron-tier RAM access latencies for each CPU tier, in cycles.\nDefault values are 1, 5, and 25.");
     	prop = cfg.get(Configuration.CATEGORY_GENERAL, "ramTier2Latency", defaultRamTier2Latency);
     	ramTier2Latency = prop.getIntList();
     	if(ramTier2Latency == null || ramTier2Latency.length < 3) {
     		ramTier2Latency = defaultRamTier1Latency;
     		prop.set(defaultRamTier2Latency);
     	}
-    	prop.comment = "Gold-tier RAM access latencies for each CPU tier, in cycles.\nDefault values are 1, 1, and 5.";
+    	prop.setComment("Gold-tier RAM access latencies for each CPU tier, in cycles.\nDefault values are 1, 1, and 5.");
     	prop = cfg.get(Configuration.CATEGORY_GENERAL, "ramTier3Latency", defaultRamTier3Latency);
     	ramTier3Latency = prop.getIntList();
     	if(ramTier3Latency == null || ramTier3Latency.length < 3) {
     		ramTier3Latency = defaultRamTier3Latency;
     		prop.set(defaultRamTier3Latency);
     	}
-    	prop.comment = "Diamond-tier RAM access latencies for each CPU tier, in cycles.\nDefault values are 1, 1, and 1.";
+    	prop.setComment("Diamond-tier RAM access latencies for each CPU tier, in cycles.\nDefault values are 1, 1, and 1.");
     	/* ROM latency */
     	prop = cfg.get(Configuration.CATEGORY_GENERAL, "romLatency", defaultRomLatency);
     	romLatency = prop.getIntList();
@@ -202,42 +202,42 @@ public class OCARM {
     		romLatency = defaultRomLatency;
     		prop.set(defaultRomLatency);
     	}
-    	prop.comment = "ROM/SRAM access latencies for each CPU tier, in cycles.\nDefault values are 2, 10, and 50, simulating ~10KHz/~100us ROM.";
+    	prop.setComment("ROM/SRAM access latencies for each CPU tier, in cycles.\nDefault values are 2, 10, and 50, simulating ~10KHz/~100us ROM.");
     	/* RAMless computers */
     	prop = cfg.get(Configuration.CATEGORY_GENERAL, "allowRAMlessComputers", defaultAllowRAMlessComputers);
     	allowRAMlessComputers = prop.getBoolean(defaultAllowRAMlessComputers);
     	prop.set(allowRAMlessComputers);
-    	prop.comment = "Whether to allow booting of computers with no RAM installed.\nUnlike with Lua computers, ARM computers can *technically* get some stuff\ndone even with no RAM...";
+    	prop.setComment("Whether to allow booting of computers with no RAM installed.\nUnlike with Lua computers, ARM computers can *technically* get some stuff\ndone even with no RAM...");
     	/* ROMDev */
     	prop = cfg.get(Configuration.CATEGORY_GENERAL, "allowROMDevArchitecture", defaultAllowROMDevArchitecture);
     	allowROMDevArchitecture = prop.getBoolean(defaultAllowROMDevArchitecture);
     	prop.set(allowROMDevArchitecture);
-    	prop.comment = "Whether an additional architecture will be enabled, which dumps CPU state\nand errors out whenever an exception occurs. This can be useful when\ndeveloping ROMs, and shouldn't be used otherwise.";
+    	prop.setComment("Whether an additional architecture will be enabled, which dumps CPU state\nand errors out whenever an exception occurs. This can be useful when\ndeveloping ROMs, and shouldn't be used otherwise.");
     	/* ROMDev core dumps */
     	prop = cfg.get(Configuration.CATEGORY_GENERAL, "romDevCoreDumpFile", defaultROMDevCoreDumpFile);
     	romDevCoreDumpFile = prop.getString();
     	prop.set(romDevCoreDumpFile);
-    	prop.comment = "If non-empty, the ROMDev architecture will make a core dump on exceptions\ncontaining the complete memory and register state of the CPU when an\nexception occurs, suitable for examination in GDB.\nNote that core dumps assumes some things that aren't always true:\n  * Virtual memory not in use\n  * ROM mapped at 0xFFFF0000 (_mostly_ accurate)\n  * FPU not in use\n  * ROM mapping valid (EEPROM present)";
+    	prop.setComment("If non-empty, the ROMDev architecture will make a core dump on exceptions\ncontaining the complete memory and register state of the CPU when an\nexception occurs, suitable for examination in GDB.\nNote that core dumps assumes some things that aren't always true:\n  * Virtual memory not in use\n  * ROM mapped at 0xFFFF0000 (_mostly_ accurate)\n  * FPU not in use\n  * ROM mapping valid (EEPROM present)");
     	/* Random initial RAM */
     	prop = cfg.get(Configuration.CATEGORY_GENERAL, "randomInitialRAM", defaultRandomInitialRAM);
     	randomInitialRAM = prop.getBoolean(defaultRandomInitialRAM);
     	prop.set(randomInitialRAM);
-    	prop.comment = "Whether to randomize RAM on bootup";
+    	prop.setComment("Whether to randomize RAM on bootup");
     	/* Trace invocations */
     	prop = cfg.get(Configuration.CATEGORY_GENERAL, "traceInvocations", defaultTraceInvocations);
     	traceInvocations = prop.getBoolean(defaultTraceInvocations);
     	prop.set(traceInvocations);
-    	prop.comment = "Whether to log every invocation and sleep";
+    	prop.setComment("Whether to log every invocation and sleep");
     	/* Debug coprocessor */
     	prop = cfg.get(Configuration.CATEGORY_GENERAL, "allowSerialDebugCP", defaultAllowSerialDebugCP);
     	allowSerialDebugCP = prop.getBoolean(defaultAllowSerialDebugCP);
     	prop.set(allowSerialDebugCP);
-    	prop.comment = "Whether to enable coprocessor #7, allowing writing to the game log.\nONLY enable this if you are developing a ROM and are facing a problem you\ncan't debug another way!";
+    	prop.setComment("Whether to enable coprocessor #7, allowing writing to the game log.\nONLY enable this if you are developing a ROM and are facing a problem you\ncan't debug another way!");
     	/* Wide ROM */
     	prop = cfg.get(Configuration.CATEGORY_GENERAL, "wideRom", defaultWideRom);
     	wideRom = prop.getBoolean(defaultWideRom);
     	prop.set(wideRom);
-    	prop.comment = "Whether ROM/SRAM support 32-bit access.";
+    	prop.setComment("Whether ROM/SRAM support 32-bit access.");
     	/* Wide CPUs */
     	prop = cfg.get(Configuration.CATEGORY_GENERAL, "wideCpu", defaultWideCpu);
     	wideCpu = prop.getBooleanList();
@@ -245,7 +245,7 @@ public class OCARM {
     		wideCpu = defaultWideCpu;
     		prop.set(wideCpu);
     	}
-    	prop.comment = "Whether CPUs at each tier are capable of 32-bit access.\nFor 32-bit accesses to take place, both the CPU and the memory module\nbeing accessed must support 32-bit operation.";
+    	prop.setComment("Whether CPUs at each tier are capable of 32-bit access.\nFor 32-bit accesses to take place, both the CPU and the memory module\nbeing accessed must support 32-bit operation.");
     	/* Wide RAMs */
     	prop = cfg.get(Configuration.CATEGORY_GENERAL, "wideRam", defaultWideRam);
     	wideRam = prop.getBooleanList();
@@ -253,7 +253,7 @@ public class OCARM {
     		wideRam = defaultWideRam;
     		prop.set(wideRam);
     	}
-    	prop.comment = "Whether memory modules at each tier are capable of 32-bit access.";
+    	prop.setComment("Whether memory modules at each tier are capable of 32-bit access.");
     	/* done */
     	cfg.save();
     }
